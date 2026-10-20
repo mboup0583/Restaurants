@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ticket Resto - Admin</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="login-page" class="page">
+    <div class="login-card">
+      <h1>Ticket Resto</h1>
+      <p class="subtitle">Espace Administrateur</p>
+      <form id="login-form">
+        <label>Email</label>
+        <input type="email" id="login-email" required placeholder="admin@zig.univ.sn" />
+        <label>Mot de passe</label>
+        <input type="password" id="login-password" required placeholder="••••••••" />
+        <button type="submit">Se connecter</button>
+        <p id="login-error" class="error"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app-page" class="page hidden">
+    <aside class="sidebar">
+      <div class="brand">Ticket Resto</div>
+      <nav>
+        <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+        <button class="nav-btn" data-view="users">Utilisateurs</button>
+        <button class="nav-btn" data-view="tickets">Tickets</button>
+        <button class="nav-btn" data-view="refunds">Remboursements</button>
+        <button class="nav-btn" data-view="prices">Prix</button>
+      </nav>
+      <button id="logout-btn" class="logout">Déconnexion</button>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <h2 id="view-title">Dashboard</h2>
+        <span id="admin-name"></span>
+      </header>
+
+      <section id="view-dashboard" class="view">
+        <div class="cards" id="stats-cards"></div>
+      </section>
+
+      <section id="view-users" class="view hidden">
+        <div class="toolbar">
+          <select id="user-filter">
+            <option value="Tous">Tous</option>
+            <option value="Étudiant">Étudiant</option>
+            <option value="Agent universitaire">Agent</option>
+            <option value="Administrateur">Administrateur</option>
+          </select>
+          <button id="refresh-users">Actualiser</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nom</th>
+                <th>Email</th>
+                <th>Type</th>
+                <th>Matricule</th>
+                <th>Statut</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="view-tickets" class="view hidden">
+        <div class="toolbar">
+          <select id="ticket-filter">
+            <option value="Tous">Tous</option>
+            <option value="ACTIVE">Actifs</option>
+            <option value="USED">Utilisés</option>
+            <option value="TRANSFERRED">Transférés</option>
+            <option value="REFUNDED">Remboursés</option>
+          </select>
+          <button id="refresh-tickets">Actualiser</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Type</th>
+                <th>Prix</th>
+                <th>Propriétaire</th>
+                <th>Paiement</th>
+                <th>Statut</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="tickets-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="view-refunds" class="view hidden">
+        <div class="toolbar">
+          <button id="refresh-refunds">Actualiser</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Utilisateur</th>
+                <th>Ticket</th>
+                <th>Montant</th>
+                <th>Moyen</th>
+                <th>Statut</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="refunds-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="view-prices" class="view hidden">
+        <div class="price-form">
+          <div class="form-row">
+            <label>Petit-déjeuner (FCFA)</label>
+            <input type="number" id="price-pdj" min="0" step="1" />
+          </div>
+          <div class="form-row">
+            <label>Repas (FCFA)</label>
+            <input type="number" id="price-repas" min="0" step="1" />
+          </div>
+          <button id="save-prices">Enregistrer les prix</button>
+          <p id="prices-msg" class="msg"></p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL EDIT USER -->
+  <div id="modal-user" class="modal hidden">
+    <div class="modal-card">
+      <h3>Modifier l'utilisateur</h3>
+      <input type="hidden" id="edit-user-id" />
+      <label>Nom complet</label>
+      <input type="text" id="edit-full-name" />
+      <label>Email</label>
+      <input type="email" id="edit-email" />
+      <label>Nouveau mot de passe (laisser vide = inchangé)</label>
+      <input type="password" id="edit-password" placeholder="••••••••" />
+      <label class="checkbox-label">
+        <input type="checkbox" id="edit-active" /> Compte actif
+      </label>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="cancel-edit-user">Annuler</button>
+        <button class="btn-primary" id="save-edit-user">Enregistrer</button>
+      </div>
+      <p id="edit-user-error" class="error"></p>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

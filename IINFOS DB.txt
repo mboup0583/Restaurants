@@ -1,0 +1,334 @@
+Microsoft Windows [version 10.0.19045.7548]
+(c) Microsoft Corporation. Tous droits réservés.
+
+C:\wamp64\bin\mysql\mysql8.4.7\bin>mysql -u root -p
+Enter password:
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 8
+Server version: 8.4.7 MySQL Community Server - GPL
+
+Copyright (c) 2000, 2025, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> -- Créer la nouvelle base
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE DATABASE IF NOT EXISTS ticket_resto_db
+    -> CHARACTER SET utf8mb4
+    -> COLLATE utf8mb4_unicode_ci;
+Query OK, 1 row affected (0.02 sec)
+
+mysql>
+mysql> USE ticket_resto_db;
+Database changed
+mysql>
+mysql> -- ==================== TABLE USERS ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE users (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     full_name       VARCHAR(255) NOT NULL,
+    ->     email           VARCHAR(255) NOT NULL UNIQUE,
+    ->     password        VARCHAR(255) NOT NULL,
+    ->     user_type       ENUM('Administrateur', 'Agent universitaire', 'Étudiant') NOT NULL,
+    ->     student_id      VARCHAR(50) NULL,
+    ->     is_active       TINYINT(1) DEFAULT 1,
+    ->     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ->
+    ->     INDEX idx_email (email),
+    ->     INDEX idx_user_type (user_type),
+    ->     INDEX idx_student_id (student_id)
+    -> );
+ERROR 1071 (42000): La clé est trop longue. Longueur maximale: 1000
+mysql>
+mysql> -- ==================== TABLE TICKETS (individuels) ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE tickets (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     ticket_code     VARCHAR(100) NOT NULL UNIQUE,   -- Ex: PDJ_A1B2C3D4_...
+    ->     type            ENUM('Petit-déjeuner', 'Repas') NOT NULL,
+    ->     user_id         INT NOT NULL,
+    ->     price           DECIMAL(10,2) NOT NULL,
+    ->     status          ENUM('ACTIVE', 'USED', 'TRANSFERRED', 'REFUNDED') DEFAULT 'ACTIVE',
+    ->     payment_method  VARCHAR(50) NULL,
+    ->     used_at         DATETIME NULL,
+    ->     used_by_agent   INT NULL,                       -- id de l'agent qui a scanné
+    ->     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ->
+    ->     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    ->     FOREIGN KEY (used_by_agent) REFERENCES users(id) ON DELETE SET NULL,
+    ->
+    ->     INDEX idx_ticket_code (ticket_code),
+    ->     INDEX idx_user_status (user_id, status),
+    ->     INDEX idx_type_status (type, status)
+    -> );
+Query OK, 0 rows affected (0.02 sec)
+
+mysql>
+mysql> -- ==================== TABLE TRANSFERTS ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE transfers (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     from_user_id    INT NOT NULL,
+    ->     to_user_id      INT NOT NULL,
+    ->     ticket_id       INT NOT NULL,
+    ->     transferred_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->
+    ->     FOREIGN KEY (from_user_id) REFERENCES users(id),
+    ->     FOREIGN KEY (to_user_id) REFERENCES users(id),
+    ->     FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+    ->
+    ->     INDEX idx_from_user (from_user_id),
+    ->     INDEX idx_to_user (to_user_id)
+    -> );
+Query OK, 0 rows affected (0.01 sec)
+
+mysql>
+mysql> -- ==================== TABLE REMBOURSEMENTS ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE refunds (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     user_id         INT NOT NULL,
+    ->     ticket_id       INT NOT NULL,
+    ->     amount          DECIMAL(10,2) NOT NULL,
+    ->     payment_method  VARCHAR(50) NOT NULL,           -- Wave, Orange Money, Ecobank
+    ->     status          ENUM('PENDING', 'COMPLETED', 'REJECTED') DEFAULT 'PENDING',
+    ->     processed_by    INT NULL,                       -- admin qui a traité
+    ->     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->     processed_at    DATETIME NULL,
+    ->
+    ->     FOREIGN KEY (user_id) REFERENCES users(id),
+    ->     FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+    ->     FOREIGN KEY (processed_by) REFERENCES users(id)
+    -> );
+Query OK, 0 rows affected (0.02 sec)
+
+mysql>
+mysql> -- ==================== TABLE TRANSACTIONS (historique) ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE transactions (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     user_id         INT NOT NULL,
+    ->     type            ENUM('ACHAT', 'TRANSFERT', 'REMBOURSEMENT', 'UTILISATION') NOT NULL,
+    ->     amount          DECIMAL(10,2) DEFAULT 0,
+    ->     description     TEXT,
+    ->     reference_id    INT NULL,                       -- id du ticket / transfert / refund
+    ->     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->
+    ->     FOREIGN KEY (user_id) REFERENCES users(id),
+    ->     INDEX idx_user_type (user_id, type)
+    -> );
+Query OK, 0 rows affected (0.01 sec)
+
+mysql>
+mysql> -- ==================== UTILISATEURS PAR DÉFAUT ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> -- Mot de passe = admin123 / agent123 / etudiant123 (hash bcrypt)
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> INSERT INTO users (full_name, email, password, user_type, student_id) VALUES
+    -> ('Administrateur System', 'admin@zig.univ.sn', '$2a$10$8K1p/a0dL1LXMIgoEDFrwOfMQsF2qH3qH3qH3qH3qH3qH3qH3qH3q', 'Administrateur', NULL),
+    -> ('Agent Universitaire', 'agent@zig.univ.sn', '$2a$10$8K1p/a0dL1LXMIgoEDFrwOfMQsF2qH3qH3qH3qH3qH3qH3qH3qH3q', 'Agent universitaire', NULL),
+    -> ('Étudiant Test', 'etudiant@zig.univ.sn', '$2a$10$8K1p/a0dL1LXMIgoEDFrwOfMQsF2qH3qH3qH3qH3qH3qH3qH3qH3q', 'Étudiant', '123456');
+ERROR 1146 (42S02): La table 'ticket_resto_db.users' n'existe pas
+mysql>
+mysql>
+mysql>
+mysql>
+mysql> USE ticket_resto_db;
+Database changed
+mysql>
+mysql> DROP TABLE IF EXISTS transactions;
+Query OK, 0 rows affected (0.03 sec)
+
+mysql> DROP TABLE IF EXISTS refunds;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> DROP TABLE IF EXISTS transfers;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> DROP TABLE IF EXISTS tickets;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> DROP TABLE IF EXISTS users;
+Query OK, 0 rows affected, 1 warning (0.00 sec)
+
+mysql>
+mysql>
+mysql>
+mysql> USE ticket_resto_db;
+Database changed
+mysql>
+mysql> -- ==================== TABLE USERS ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE users (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     full_name       VARCHAR(255) NOT NULL,
+    ->     email           VARCHAR(191) NOT NULL UNIQUE,   -- 191 au lieu de 255 pour utf8mb4
+    ->     password        VARCHAR(255) NOT NULL,
+    ->     user_type       ENUM('Administrateur', 'Agent universitaire', 'Étudiant') NOT NULL,
+    ->     student_id      VARCHAR(50) NULL,
+    ->     is_active       TINYINT(1) DEFAULT 1,
+    ->     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ->
+    ->     INDEX idx_user_type (user_type),
+    ->     INDEX idx_student_id (student_id)
+    -> ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+Query OK, 0 rows affected, 1 warning (0.04 sec)
+
+mysql>
+mysql> -- ==================== TABLE TICKETS ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE tickets (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     ticket_code     VARCHAR(100) NOT NULL UNIQUE,
+    ->     type            ENUM('Petit-déjeuner', 'Repas') NOT NULL,
+    ->     user_id         INT NOT NULL,
+    ->     price           DECIMAL(10,2) NOT NULL,
+    ->     status          ENUM('ACTIVE', 'USED', 'TRANSFERRED', 'REFUNDED') DEFAULT 'ACTIVE',
+    ->     payment_method  VARCHAR(50) NULL,
+    ->     used_at         DATETIME NULL,
+    ->     used_by_agent   INT NULL,
+    ->     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ->
+    ->     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    ->     FOREIGN KEY (used_by_agent) REFERENCES users(id) ON DELETE SET NULL,
+    ->
+    ->     INDEX idx_ticket_code (ticket_code),
+    ->     INDEX idx_user_status (user_id, status),
+    ->     INDEX idx_type_status (type, status)
+    -> ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+Query OK, 0 rows affected (0.04 sec)
+
+mysql>
+mysql> -- ==================== TABLE TRANSFERTS ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE transfers (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     from_user_id    INT NOT NULL,
+    ->     to_user_id      INT NOT NULL,
+    ->     ticket_id       INT NOT NULL,
+    ->     transferred_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->
+    ->     FOREIGN KEY (from_user_id) REFERENCES users(id),
+    ->     FOREIGN KEY (to_user_id) REFERENCES users(id),
+    ->     FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+    ->
+    ->     INDEX idx_from_user (from_user_id),
+    ->     INDEX idx_to_user (to_user_id)
+    -> ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+Query OK, 0 rows affected (0.04 sec)
+
+mysql>
+mysql> -- ==================== TABLE REMBOURSEMENTS ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE refunds (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     user_id         INT NOT NULL,
+    ->     ticket_id       INT NOT NULL,
+    ->     amount          DECIMAL(10,2) NOT NULL,
+    ->     payment_method  VARCHAR(50) NOT NULL,
+    ->     status          ENUM('PENDING', 'COMPLETED', 'REJECTED') DEFAULT 'PENDING',
+    ->     processed_by    INT NULL,
+    ->     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->     processed_at    DATETIME NULL,
+    ->
+    ->     FOREIGN KEY (user_id) REFERENCES users(id),
+    ->     FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+    ->     FOREIGN KEY (processed_by) REFERENCES users(id)
+    -> ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+Query OK, 0 rows affected (0.04 sec)
+
+mysql>
+mysql> -- ==================== TABLE TRANSACTIONS ====================
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE transactions (
+    ->     id              INT PRIMARY KEY AUTO_INCREMENT,
+    ->     user_id         INT NOT NULL,
+    ->     type            ENUM('ACHAT', 'TRANSFERT', 'REMBOURSEMENT', 'UTILISATION') NOT NULL,
+    ->     amount          DECIMAL(10,2) DEFAULT 0,
+    ->     description     TEXT,
+    ->     reference_id    INT NULL,
+    ->     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ->
+    ->     FOREIGN KEY (user_id) REFERENCES users(id),
+    ->     INDEX idx_user_type (user_id, type)
+    -> ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+Query OK, 0 rows affected (0.03 sec)
+
+mysql> SHOW TABLES;
++---------------------------+
+| Tables_in_ticket_resto_db |
++---------------------------+
+| refunds                   |
+| tickets                   |
+| transactions              |
+| transfers                 |
+| users                     |
++---------------------------+
+5 rows in set (0.05 sec)
+
+mysql> DESCRIBE users;
++------------+---------------------------------------------------------+------+-----+-------------------+-----------------------------------------------+
+| Field      | Type                                                    | Null | Key | Default           | Extra                                         |
++------------+---------------------------------------------------------+------+-----+-------------------+-----------------------------------------------+
+| id         | int                                                     | NO   | PRI | NULL              | auto_increment                                |
+| full_name  | varchar(255)                                            | NO   |     | NULL              |                                               |
+| email      | varchar(191)                                            | NO   | UNI | NULL              |                                               |
+| password   | varchar(255)                                            | NO   |     | NULL              |                                               |
+| user_type  | enum('Administrateur','Agent universitaire','Étudiant') | NO   | MUL | NULL              |                                               |
+| student_id | varchar(50)                                             | YES  | MUL | NULL              |                                               |
+| is_active  | tinyint(1)                                              | YES  |     | 1                 |                                               |
+| created_at | datetime                                                | YES  |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED                             |
+| updated_at | datetime                                                | YES  |     | CURRENT_TIMESTAMP | DEFAULT_GENERATED on update CURRENT_TIMESTAMP |
++------------+---------------------------------------------------------+------+-----+-------------------+-----------------------------------------------+
+9 rows in set (0.01 sec)
+
+mysql>
+mysql>
+mysql>
+mysql>
+mysql>
+mysql> USE ticket_resto_db;
+Database changed
+mysql>
+mysql> INSERT INTO users (full_name, email, password, user_type, student_id) VALUES
+    -> ('Administrateur System', 'admin@zig.univ.sn', '$2b$10$pQwH0N4NKWVJzq40Agbl9OHsdJzLQ.C5tjNPiaGB0dpn3Aaqp9u2C', 'Administrateur', NULL),
+    -> ('Agent Universitaire', 'agent@zig.univ.sn', '$2b$10$DDnAojL7TVAv/n50XMfYmuVheNcOQpxM1pH4c2HMrDt0fKVm2qq6O', 'Agent universitaire', NULL),
+    -> ('Étudiant Test', 'etudiant@zig.univ.sn', '$2b$10$E7k43lcOP9zG/ej4vB83AOzJNgRdA1z0GID2e4wORNmmUEcKTEli.', 'Étudiant', '123456');
+Query OK, 3 rows affected (0.01 sec)
+Enregistrements: 3  Doublons: 0  Avertissements: 0
+
+mysql>
+mysql> SELECT id, full_name, email, user_type, student_id, is_active FROM users;
++----+-----------------------+----------------------+---------------------+------------+-----------+
+| id | full_name             | email                | user_type           | student_id | is_active |
++----+-----------------------+----------------------+---------------------+------------+-----------+
+|  1 | Administrateur System | admin@zig.univ.sn    | Administrateur      | NULL       |         1 |
+|  2 | Agent Universitaire   | agent@zig.univ.sn    | Agent universitaire | NULL       |         1 |
+|  3 | Étudiant Test         | etudiant@zig.univ.sn | Étudiant            | 123456     |         1 |
++----+-----------------------+----------------------+---------------------+------------+-----------+
+3 rows in set (0.00 sec)
+
+mysql>
+mysql>
+mysql>
