@@ -4,7 +4,7 @@ class AppConstants {
   // Pour un téléphone physique → IP de ton PC (ex: 192.168.1.67)
   //static const String baseUrl = 'http://10.0.2.2:3001';
 
-  static const String baseUrl = 'http://192.168.1.6:3001';
+  static const String baseUrl = 'http://192.168.1.5:3001';
 
   // Endpoints
   static const String loginEndpoint = '/api/mobile/login';
