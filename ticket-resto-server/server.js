@@ -1004,6 +1004,8 @@ const PAYDUNYA_BASE =
     ? 'https://app.paydunya.com/api/v1'
     : 'https://app.paydunya.com/sandbox-api/v1';
 
+const PAYDUNYA_MIN_AMOUNT = 200;
+
 function paydunyaHeaders() {
   return {
     'Content-Type': 'application/json',
@@ -1015,7 +1017,7 @@ function paydunyaHeaders() {
 
 app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
   try {
-    const { user_id, type, quantity, payment_method } = req.body;
+    const { user_id, type, quantity, payment_method, phone } = req.body;
 
     if (!user_id || !type || !quantity || quantity < 1) {
       return res.status(400).json({ success: false, message: 'Données invalides' });
@@ -1046,6 +1048,24 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
         ? priceMap.price_petit_dejeuner || 50
         : priceMap.price_repas || 100;
     const totalAmount = unitPrice * quantity;
+
+    // ✅ Contrôle du minimum Wave (200 FCFA)
+    if (totalAmount < PAYDUNYA_MIN_AMOUNT) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Montant minimum Wave : 200 FCFA. Prenez au moins 2 repas (ou 4 petits-déjeuners).',
+      });
+    }
+
+    // ✅ Vérification du numéro Wave
+    const cleanPhone = (phone || '').replace(/\s+/g, '');
+    if (!cleanPhone || cleanPhone.length < 9) {
+      return res.status(400).json({
+        success: false,
+        message: 'Numéro Wave requis (ex: 77XXXXXXX)',
+      });
+    }
 
     const [payResult] = await pool.execute(
       `INSERT INTO payments (user_id, ticket_type, quantity, amount, payment_method, status)
@@ -1096,10 +1116,39 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
       paymentId,
     ]);
 
+    // ✅ SoftPay Wave : redirection directe vers Wave
+    const fullName = req.user.full_name || 'Client Ticket Resto';
+    const email = req.user.email || 'client@ticketresto.sn';
+
+    const softpayUrl =
+      PAYDUNYA_MODE === 'live'
+        ? 'https://app.paydunya.com/api/v1/softpay/wave-senegal'
+        : 'https://app.paydunya.com/sandbox-api/v1/softpay/wave-senegal';
+
+    const softRes = await fetch(softpayUrl, {
+      method: 'POST',
+      headers: paydunyaHeaders(),
+      body: JSON.stringify({
+        wave_senegal_fullName: fullName,
+        wave_senegal_email: email,
+        wave_senegal_phone: cleanPhone,
+        wave_senegal_payment_token: data.token,
+      }),
+    });
+    const softData = await softRes.json();
+
+    if (!softData.success || !softData.url) {
+      await pool.execute(`UPDATE payments SET status = 'FAILED' WHERE id = ?`, [paymentId]);
+      return res.status(400).json({
+        success: false,
+        message: softData.message || 'Impossible de lancer le paiement Wave',
+      });
+    }
+
     res.json({
       success: true,
       payment_id: paymentId,
-      payment_url: data.response_text,
+      payment_url: softData.url, // URL Wave directe
       token: data.token,
       amount: totalAmount,
     });
