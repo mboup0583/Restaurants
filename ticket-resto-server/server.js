@@ -997,6 +997,229 @@ app.get('/api/mobile/sales-report', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== PAYDUNYA (WAVE) ====================
+const PAYDUNYA_MODE = process.env.PAYDUNYA_MODE || 'test';
+const PAYDUNYA_BASE =
+  PAYDUNYA_MODE === 'live'
+    ? 'https://app.paydunya.com/api/v1'
+    : 'https://app.paydunya.com/sandbox-api/v1';
+
+function paydunyaHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'PAYDUNYA-MASTER-KEY': process.env.PAYDUNYA_MASTER_KEY || '',
+    'PAYDUNYA-PRIVATE-KEY': process.env.PAYDUNYA_PRIVATE_KEY || '',
+    'PAYDUNYA-TOKEN': process.env.PAYDUNYA_TOKEN || '',
+  };
+}
+
+app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
+  try {
+    const { user_id, type, quantity, payment_method } = req.body;
+
+    if (!user_id || !type || !quantity || quantity < 1) {
+      return res.status(400).json({ success: false, message: 'Données invalides' });
+    }
+
+    if (payment_method !== 'Wave') {
+      return res.status(400).json({
+        success: false,
+        message: 'Seul Wave est disponible pour le moment. Orange Money bientôt.',
+      });
+    }
+
+    const allowedTypes = ['Petit-déjeuner', 'Repas'];
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({ success: false, message: 'Type de ticket invalide' });
+    }
+
+    const [priceRows] = await pool.execute(
+      `SELECT setting_key, setting_value FROM settings
+       WHERE setting_key IN ('price_petit_dejeuner', 'price_repas')`
+    );
+    const priceMap = {};
+    priceRows.forEach((r) => {
+      priceMap[r.setting_key] = parseInt(r.setting_value, 10);
+    });
+    const unitPrice =
+      type === 'Petit-déjeuner'
+        ? priceMap.price_petit_dejeuner || 50
+        : priceMap.price_repas || 100;
+    const totalAmount = unitPrice * quantity;
+
+    const [payResult] = await pool.execute(
+      `INSERT INTO payments (user_id, ticket_type, quantity, amount, payment_method, status)
+       VALUES (?, ?, ?, ?, ?, 'PENDING')`,
+      [user_id, type, quantity, totalAmount, payment_method]
+    );
+    const paymentId = payResult.insertId;
+
+    const payload = {
+      invoice: {
+        total_amount: totalAmount,
+        description: `Achat ${quantity} ticket(s) ${type} - Ticket Resto #${paymentId}`,
+      },
+      store: {
+        name: 'Ticket Resto',
+        tagline: 'Restaurant universitaire',
+      },
+      custom_data: {
+        payment_id: String(paymentId),
+        user_id: String(user_id),
+        ticket_type: type,
+        quantity: String(quantity),
+      },
+      actions: {
+        callback_url: 'https://ticket-resto-api.onrender.com/api/payments/paydunya/webhook',
+        cancel_url: 'https://ticket-resto-api.onrender.com/api/payments/cancel',
+        return_url: 'https://ticket-resto-api.onrender.com/api/payments/success',
+      },
+    };
+
+    const response = await fetch(`${PAYDUNYA_BASE}/checkout-invoice/create`, {
+      method: 'POST',
+      headers: paydunyaHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+
+    if (data.response_code !== '00') {
+      await pool.execute(`UPDATE payments SET status = 'FAILED' WHERE id = ?`, [paymentId]);
+      return res.status(400).json({
+        success: false,
+        message: data.response_text || 'Erreur PayDunya',
+      });
+    }
+
+    await pool.execute(`UPDATE payments SET paydunya_token = ? WHERE id = ?`, [
+      data.token,
+      paymentId,
+    ]);
+
+    res.json({
+      success: true,
+      payment_id: paymentId,
+      payment_url: data.response_text,
+      token: data.token,
+      amount: totalAmount,
+    });
+  } catch (err) {
+    console.error('Erreur payments/init:', err);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+app.post('/api/payments/paydunya/webhook', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const data = body.data || body;
+    const token = data.token || body.token;
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Token manquant' });
+    }
+
+    const confirmRes = await fetch(`${PAYDUNYA_BASE}/checkout-invoice/confirm/${token}`, {
+      method: 'GET',
+      headers: paydunyaHeaders(),
+    });
+    const confirm = await confirmRes.json();
+
+    const status = (confirm.status || '').toLowerCase();
+    if (status !== 'completed') {
+      return res.json({ success: true, message: 'Paiement non complété', status });
+    }
+
+    const [rows] = await pool.execute(
+      `SELECT * FROM payments WHERE paydunya_token = ? LIMIT 1`,
+      [token]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Paiement introuvable' });
+    }
+
+    const payment = rows[0];
+    if (payment.status === 'PAID') {
+      return res.json({ success: true, message: 'Déjà traité' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      await connection.execute(
+        `UPDATE payments SET status = 'PAID', paid_at = NOW() WHERE id = ?`,
+        [payment.id]
+      );
+
+      const createdTickets = [];
+      const unitPrice = Number(payment.amount) / payment.quantity;
+
+      for (let i = 0; i < payment.quantity; i++) {
+        const ticketCode = generateTicketCode(payment.ticket_type);
+        const [result] = await connection.execute(
+          `INSERT INTO tickets (ticket_code, type, user_id, price, payment_method, status)
+           VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
+          [
+            ticketCode,
+            payment.ticket_type,
+            payment.user_id,
+            unitPrice,
+            payment.payment_method,
+          ]
+        );
+        createdTickets.push({
+          id: result.insertId,
+          ticket_code: ticketCode,
+          type: payment.ticket_type,
+          price: unitPrice,
+          status: 'ACTIVE',
+        });
+      }
+
+      await connection.execute(
+        `INSERT INTO transactions (user_id, type, amount, description, reference_id)
+         VALUES (?, 'ACHAT', ?, ?, ?)`,
+        [
+          payment.user_id,
+          payment.amount,
+          `Achat de ${payment.quantity} ticket(s) ${payment.ticket_type} (Wave)`,
+          createdTickets[0]?.id || null,
+        ]
+      );
+
+      await connection.commit();
+      broadcast({
+        type: 'TICKETS_BOUGHT',
+        user_id: payment.user_id,
+        tickets: createdTickets,
+      });
+    } catch (e) {
+      await connection.rollback();
+      throw e;
+    } finally {
+      connection.release();
+    }
+
+    res.json({ success: true, message: 'Paiement validé, tickets créés' });
+  } catch (err) {
+    console.error('Erreur webhook PayDunya:', err);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
+app.get('/api/payments/success', (req, res) => {
+  res.send(
+    '<h2>Paiement réussi</h2><p>Vous pouvez revenir dans l\'application Ticket Resto.</p>'
+  );
+});
+
+app.get('/api/payments/cancel', (req, res) => {
+  res.send(
+    '<h2>Paiement annulé</h2><p>Vous pouvez revenir dans l\'application.</p>'
+  );
+});
+
 // ==================== SANTÉ ====================
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', database: 'ticket_resto_db', time: new Date().toISOString() });
