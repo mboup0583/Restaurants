@@ -9,18 +9,18 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const jwt = require('jsonwebtoken');
-
+ 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-
+ 
 const JWT_SECRET = process.env.JWT_SECRET || 'ticket_resto_secret_2026_change_me';
-
+ 
 // ==================== MIDDLEWARE ====================
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
+ 
 // Middleware d'authentification
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
@@ -36,14 +36,14 @@ function authMiddleware(req, res, next) {
     return res.status(401).json({ success: false, message: 'Token invalide ou expiré' });
   }
 }
-
+ 
 function adminMiddleware(req, res, next) {
   if (!req.user || req.user.user_type !== 'Administrateur') {
     return res.status(403).json({ success: false, message: 'Accès admin requis' });
   }
   next();
 }
-
+ 
 function signToken(user) {
   return jwt.sign(
     {
@@ -56,7 +56,7 @@ function signToken(user) {
     { expiresIn: '7d' }
   );
 }
-
+ 
 // ==================== CONNEXION MYSQL ====================
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -67,7 +67,7 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0
 });
-
+ 
 async function testConnection() {
   try {
     const connection = await pool.getConnection();
@@ -78,10 +78,10 @@ async function testConnection() {
     process.exit(1);
   }
 }
-
+ 
 // ==================== WEBSOCKET ====================
 const clients = new Set();
-
+ 
 wss.on('connection', (ws) => {
   clients.add(ws);
   console.log('🔌 Client WebSocket connecté. Total:', clients.size);
@@ -90,7 +90,7 @@ wss.on('connection', (ws) => {
     console.log('🔌 Client déconnecté. Total:', clients.size);
   });
 });
-
+ 
 function broadcast(data) {
   const message = JSON.stringify(data);
   clients.forEach((client) => {
@@ -99,7 +99,7 @@ function broadcast(data) {
     }
   });
 }
-
+ 
 // ==================== CONFIGURATION EMAIL ====================
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -113,18 +113,18 @@ const transporter = nodemailer.createTransport({
     rejectUnauthorized: false,
   },
 });
-
+ 
 // ==================== STOCKAGE TEMPORAIRE DES CODES ====================
 const verificationCodes = new Map();
-
+ 
 function generateVerificationCode() {
   return Math.floor(10000 + Math.random() * 90000).toString();
 }
-
+ 
 async function sendVerificationEmail(email, code, fullName) {
   try {
     await transporter.verify();
-    
+ 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <div style="text-align: center; background-color: #ff6b00; padding: 20px; border-radius: 10px 10px 0 0;">
@@ -148,14 +148,14 @@ async function sendVerificationEmail(email, code, fullName) {
         </div>
       </div>
     `;
-
+ 
     await transporter.sendMail({
       from: `"Ticket Resto" <${process.env.SMTP_USER}>`,
       to: email,
       subject: 'Vérification de votre compte Ticket Resto',
       html,
     });
-
+ 
     console.log(`✅ Email envoyé à ${email}`);
     return true;
   } catch (error) {
@@ -163,7 +163,7 @@ async function sendVerificationEmail(email, code, fullName) {
     return false;
   }
 }
-
+ 
 // ==================== UTILITAIRES ====================
 function generateTicketCode(type) {
   const prefix = type === 'Petit-déjeuner' ? 'PDJ' : 'REP';
@@ -171,34 +171,34 @@ function generateTicketCode(type) {
   const timestamp = Date.now().toString(36).toUpperCase();
   return `${prefix}_${random}_${timestamp}`;
 }
-
+ 
 // ==================== ROUTES AUTH ====================
-
+ 
 app.post('/api/mobile/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email et mot de passe requis' });
     }
-
+ 
     const [rows] = await pool.execute(
       'SELECT * FROM users WHERE email = ? AND is_active = 1',
       [email]
     );
-
+ 
     if (rows.length === 0) {
       return res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect' });
     }
-
+ 
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect' });
     }
-
+ 
     const { password: _, ...userWithoutPassword } = user;
     const token = signToken(userWithoutPassword);
-
+ 
     res.json({
       success: true,
       message: 'Connexion réussie',
@@ -210,32 +210,32 @@ app.post('/api/mobile/login', async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== ENVOI CODE VÉRIFICATION ====================
 app.post('/api/mobile/send-verification-code', async (req, res) => {
   try {
     const { full_name, email, password, user_type, student_id } = req.body;
-
+ 
     if (!full_name || !email || !password || !user_type) {
       return res.status(400).json({ success: false, message: 'Champs obligatoires manquants' });
     }
-
+ 
     const allowedTypes = ['Administrateur', 'Agent universitaire', 'Étudiant'];
     if (!allowedTypes.includes(user_type)) {
       return res.status(400).json({ success: false, message: 'Type d\'utilisateur invalide' });
     }
-
+ 
     if (user_type === 'Étudiant' && !student_id) {
       return res.status(400).json({ success: false, message: 'Numéro étudiant obligatoire' });
     }
-
+ 
     const [existing] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) {
       return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé' });
     }
-
+ 
     const code = generateVerificationCode();
-
+ 
     verificationCodes.set(email, {
       full_name,
       password,
@@ -244,14 +244,14 @@ app.post('/api/mobile/send-verification-code', async (req, res) => {
       code,
       expires: Date.now() + 15 * 60 * 1000,
     });
-
+ 
     let emailSent = false;
     let mailError = null;
-
+ 
     try {
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
         await transporter.verify();
-
+ 
         await transporter.sendMail({
           from: `"Ticket Resto" <${process.env.SMTP_USER}>`,
           to: email,
@@ -265,7 +265,7 @@ app.post('/api/mobile/send-verification-code', async (req, res) => {
             <p>Il expire dans 10 minutes.</p>
           `,
         });
-
+ 
         emailSent = true;
         console.log(`✅ Email envoyé à ${email}`);
       } else {
@@ -275,9 +275,9 @@ app.post('/api/mobile/send-verification-code', async (req, res) => {
       mailError = mailErr.message;
       console.error('❌ Erreur SMTP:', mailErr.message);
     }
-
+ 
     console.log(`\n📧 Code de vérification pour ${email} : ${code}\n`);
-
+ 
     res.json({
       success: true,
       message: emailSent
@@ -290,38 +290,38 @@ app.post('/api/mobile/send-verification-code', async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== VÉRIFIER CODE + CRÉER COMPTE ====================
 app.post('/api/mobile/verify-and-register', async (req, res) => {
   try {
     const { email, code } = req.body;
-
+ 
     if (!email || !code) {
       return res.status(400).json({ success: false, message: 'Email et code requis' });
     }
-
+ 
     const stored = verificationCodes.get(email);
-
+ 
     if (!stored) {
       return res.status(400).json({ success: false, message: 'Aucune demande de vérification en cours' });
     }
-
+ 
     if (stored.code !== code) {
       return res.status(400).json({ success: false, message: 'Code incorrect' });
     }
-
+ 
     if (Date.now() > stored.expires) {
       verificationCodes.delete(email);
       return res.status(400).json({ success: false, message: 'Le code a expiré. Veuillez réessayer.' });
     }
-
+ 
     const hashedPassword = await bcrypt.hash(stored.password, 10);
-
+ 
     const [result] = await pool.execute(
       `INSERT INTO users (full_name, email, password, user_type, student_id) VALUES (?, ?, ?, ?, ?)`,
       [stored.full_name, email, hashedPassword, stored.user_type, stored.student_id]
     );
-
+ 
     const newUser = {
       id: result.insertId,
       full_name: stored.full_name,
@@ -330,13 +330,13 @@ app.post('/api/mobile/verify-and-register', async (req, res) => {
       student_id: stored.student_id,
       is_active: 1
     };
-
+ 
     const token = signToken(newUser);
-
+ 
     broadcast({ type: 'USER_ADDED', user: newUser });
-
+ 
     verificationCodes.delete(email);
-
+ 
     res.status(201).json({
       success: true,
       message: 'Inscription réussie',
@@ -348,37 +348,37 @@ app.post('/api/mobile/verify-and-register', async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== ROUTE REGISTER (ANCIENNE - GARDÉE POUR COMPATIBILITÉ) ====================
 app.post('/api/mobile/register', async (req, res) => {
   try {
     const { full_name, email, password, user_type, student_id } = req.body;
-
+ 
     if (!full_name || !email || !password || !user_type) {
       return res.status(400).json({ success: false, message: 'Champs obligatoires manquants' });
     }
-
+ 
     const allowedTypes = ['Administrateur', 'Agent universitaire', 'Étudiant'];
     if (!allowedTypes.includes(user_type)) {
       return res.status(400).json({ success: false, message: 'Type d\'utilisateur invalide' });
     }
-
+ 
     if (user_type === 'Étudiant' && !student_id) {
       return res.status(400).json({ success: false, message: 'Numéro étudiant obligatoire' });
     }
-
+ 
     const [existing] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) {
       return res.status(409).json({ success: false, message: 'Cet email est déjà utilisé' });
     }
-
+ 
     const hashedPassword = await bcrypt.hash(password, 10);
-
+ 
     const [result] = await pool.execute(
       `INSERT INTO users (full_name, email, password, user_type, student_id) VALUES (?, ?, ?, ?, ?)`,
       [full_name, email, hashedPassword, user_type, student_id || null]
     );
-
+ 
     const newUser = {
       id: result.insertId,
       full_name,
@@ -387,9 +387,9 @@ app.post('/api/mobile/register', async (req, res) => {
       student_id: student_id || null,
       is_active: 1
     };
-
+ 
     const token = signToken(newUser);
-
+ 
     broadcast({ type: 'USER_ADDED', user: newUser });
     res.status(201).json({
       success: true,
@@ -402,7 +402,7 @@ app.post('/api/mobile/register', async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 app.get('/api/mobile/users', authMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.execute(
@@ -414,22 +414,22 @@ app.get('/api/mobile/users', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== ROUTES TICKETS ====================
-
+ 
 app.post('/api/mobile/tickets/buy', authMiddleware, async (req, res) => {
   try {
     const { user_id, type, quantity, payment_method } = req.body;
-
+ 
     if (!user_id || !type || !quantity || quantity < 1) {
       return res.status(400).json({ success: false, message: 'Données invalides' });
     }
-
+ 
     const allowedTypes = ['Petit-déjeuner', 'Repas'];
     if (!allowedTypes.includes(type)) {
       return res.status(400).json({ success: false, message: 'Type de ticket invalide' });
     }
-
+ 
     // Récupérer les prix depuis la table settings
     const [priceRows] = await pool.execute(
       `SELECT setting_key, setting_value FROM settings
@@ -440,13 +440,13 @@ app.post('/api/mobile/tickets/buy', authMiddleware, async (req, res) => {
     const price = type === 'Petit-déjeuner'
       ? (priceMap.price_petit_dejeuner || 50)
       : (priceMap.price_repas || 100);
-
+ 
     const createdTickets = [];
-
+ 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-
+ 
       for (let i = 0; i < quantity; i++) {
         const ticketCode = generateTicketCode(type);
         const [result] = await connection.execute(
@@ -454,7 +454,7 @@ app.post('/api/mobile/tickets/buy', authMiddleware, async (req, res) => {
            VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
           [ticketCode, type, user_id, price, payment_method || 'Simulation']
         );
-
+ 
         createdTickets.push({
           id: result.insertId,
           ticket_code: ticketCode,
@@ -463,16 +463,16 @@ app.post('/api/mobile/tickets/buy', authMiddleware, async (req, res) => {
           status: 'ACTIVE'
         });
       }
-
+ 
       await connection.execute(
         `INSERT INTO transactions (user_id, type, amount, description, reference_id)
          VALUES (?, 'ACHAT', ?, ?, ?)`,
         [user_id, price * quantity, `Achat de ${quantity} ticket(s) ${type}`, createdTickets[0]?.id]
       );
-
+ 
       await connection.commit();
       broadcast({ type: 'TICKETS_BOUGHT', user_id, tickets: createdTickets });
-
+ 
       res.status(201).json({
         success: true,
         message: `${quantity} ticket(s) acheté(s) avec succès`,
@@ -489,7 +489,7 @@ app.post('/api/mobile/tickets/buy', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 app.get('/api/mobile/tickets/my/:userId', authMiddleware, async (req, res) => {
   try {
     const userId = req.params.userId;
@@ -504,38 +504,38 @@ app.get('/api/mobile/tickets/my/:userId', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 app.post('/api/mobile/tickets/validate', authMiddleware, async (req, res) => {
   try {
     const { ticket_code, agent_id } = req.body;
-
+ 
     if (!ticket_code || !agent_id) {
       return res.status(400).json({ success: false, message: 'ticket_code et agent_id requis' });
     }
-
+ 
     const [rows] = await pool.execute('SELECT * FROM tickets WHERE ticket_code = ?', [ticket_code]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Ticket introuvable' });
     }
-
+ 
     const ticket = rows[0];
     if (ticket.status !== 'ACTIVE') {
       return res.status(400).json({ success: false, message: `Ticket déjà ${ticket.status.toLowerCase()}` });
     }
-
+ 
     await pool.execute(
       `UPDATE tickets SET status = 'USED', used_at = NOW(), used_by_agent = ? WHERE id = ?`,
       [agent_id, ticket.id]
     );
-
+ 
     await pool.execute(
       `INSERT INTO transactions (user_id, type, amount, description, reference_id)
        VALUES (?, 'UTILISATION', 0, ?, ?)`,
       [ticket.user_id, `Ticket ${ticket.type} utilisé`, ticket.id]
     );
-
+ 
     broadcast({ type: 'TICKET_USED', ticket_code, user_id: ticket.user_id, agent_id });
-
+ 
     res.json({
       success: true,
       message: 'Ticket validé avec succès',
@@ -546,70 +546,70 @@ app.post('/api/mobile/tickets/validate', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== TRANSFERT ====================
-
+ 
 app.post('/api/mobile/tickets/transfer', authMiddleware, async (req, res) => {
   try {
     const { from_user_id, to_user_id, ticket_id } = req.body;
-
+ 
     if (!from_user_id || !to_user_id || !ticket_id) {
       return res.status(400).json({ success: false, message: 'Données manquantes' });
     }
-
+ 
     if (from_user_id === to_user_id) {
       return res.status(400).json({ success: false, message: 'Impossible de se transférer à soi-même' });
     }
-
+ 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-
+ 
       const [tickets] = await connection.execute(
         'SELECT * FROM tickets WHERE id = ? AND user_id = ? AND status = "ACTIVE"',
         [ticket_id, from_user_id]
       );
-
+ 
       if (tickets.length === 0) {
         await connection.rollback();
         return res.status(400).json({ success: false, message: 'Ticket introuvable ou non transferable' });
       }
-
+ 
       const [users] = await connection.execute(
         'SELECT id FROM users WHERE id = ? AND is_active = 1',
         [to_user_id]
       );
-
+ 
       if (users.length === 0) {
         await connection.rollback();
         return res.status(404).json({ success: false, message: 'Destinataire introuvable' });
       }
-
+ 
       await connection.execute(
         `UPDATE tickets SET user_id = ?, status = 'TRANSFERRED' WHERE id = ?`,
         [to_user_id, ticket_id]
       );
-
+ 
       await connection.execute(
         `INSERT INTO transfers (from_user_id, to_user_id, ticket_id) VALUES (?, ?, ?)`,
         [from_user_id, to_user_id, ticket_id]
       );
-
+ 
       await connection.execute(
         `INSERT INTO transactions (user_id, type, amount, description, reference_id)
          VALUES (?, 'TRANSFERT', 0, ?, ?)`,
         [from_user_id, `Transfert du ticket #${ticket_id} vers utilisateur ${to_user_id}`, ticket_id]
       );
-
+ 
       await connection.commit();
-
+ 
       broadcast({
         type: 'TICKET_TRANSFERRED',
         ticket_id,
         from_user_id,
         to_user_id
       });
-
+ 
       res.json({
         success: true,
         message: 'Ticket transféré avec succès'
@@ -625,59 +625,59 @@ app.post('/api/mobile/tickets/transfer', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== REMBOURSEMENT ====================
-
+ 
 app.post('/api/mobile/tickets/refund', authMiddleware, async (req, res) => {
   try {
     const { user_id, ticket_id, payment_method } = req.body;
-
+ 
     if (!user_id || !ticket_id || !payment_method) {
       return res.status(400).json({ success: false, message: 'Données manquantes' });
     }
-
+ 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-
+ 
       const [tickets] = await connection.execute(
         'SELECT * FROM tickets WHERE id = ? AND user_id = ? AND status = "ACTIVE"',
         [ticket_id, user_id]
       );
-
+ 
       if (tickets.length === 0) {
         await connection.rollback();
         return res.status(400).json({ success: false, message: 'Ticket introuvable ou non remboursable' });
       }
-
+ 
       const ticket = tickets[0];
-
+ 
       await connection.execute(
         `UPDATE tickets SET status = 'REFUNDED' WHERE id = ?`,
         [ticket_id]
       );
-
+ 
       const [result] = await connection.execute(
         `INSERT INTO refunds (user_id, ticket_id, amount, payment_method, status)
          VALUES (?, ?, ?, ?, 'PENDING')`,
         [user_id, ticket_id, ticket.price, payment_method]
       );
-
+ 
       await connection.execute(
         `INSERT INTO transactions (user_id, type, amount, description, reference_id)
          VALUES (?, 'REMBOURSEMENT', ?, ?, ?)`,
         [user_id, ticket.price, `Demande de remboursement ticket #${ticket_id}`, result.insertId]
       );
-
+ 
       await connection.commit();
-
+ 
       broadcast({
         type: 'REFUND_REQUESTED',
         user_id,
         ticket_id,
         amount: ticket.price
       });
-
+ 
       res.json({
         success: true,
         message: 'Demande de remboursement enregistrée',
@@ -694,7 +694,7 @@ app.post('/api/mobile/tickets/refund', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== TOUS LES TICKETS (ADMIN) ====================
 app.get('/api/mobile/tickets', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -712,22 +712,22 @@ app.get('/api/mobile/tickets', authMiddleware, adminMiddleware, async (req, res)
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== STATISTIQUES (ADMIN) ====================
 app.get('/api/mobile/stats', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const [usersByType] = await pool.execute(
       `SELECT user_type, COUNT(*) as count FROM users WHERE is_active = 1 GROUP BY user_type`
     );
-
+ 
     const [ticketsByStatus] = await pool.execute(
       `SELECT status, COUNT(*) as count FROM tickets GROUP BY status`
     );
-
+ 
     const [ticketsByType] = await pool.execute(
       `SELECT type, COUNT(*) as count, SUM(price) as total FROM tickets GROUP BY type`
     );
-
+ 
     const [revenue] = await pool.execute(
       `SELECT 
          COALESCE(SUM(CASE WHEN status IN ('ACTIVE','USED','TRANSFERRED') THEN price ELSE 0 END), 0) as total_sales,
@@ -735,11 +735,11 @@ app.get('/api/mobile/stats', authMiddleware, adminMiddleware, async (req, res) =
          COUNT(*) as total_tickets
        FROM tickets`
     );
-
+ 
     const [recentTickets] = await pool.execute(
       `SELECT COUNT(*) as count FROM tickets WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`
     );
-
+ 
     res.json({
       success: true,
       stats: {
@@ -755,17 +755,17 @@ app.get('/api/mobile/stats', authMiddleware, adminMiddleware, async (req, res) =
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== ADMIN : UTILISATEURS ====================
-
+ 
 app.patch('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const userId = req.params.id;
     const { email, password, is_active, full_name } = req.body;
-
+ 
     const updates = [];
     const values = [];
-
+ 
     if (full_name !== undefined) {
       updates.push('full_name = ?');
       values.push(full_name);
@@ -790,28 +790,28 @@ app.patch('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, r
       updates.push('is_active = ?');
       values.push(is_active ? 1 : 0);
     }
-
+ 
     if (updates.length === 0) {
       return res.status(400).json({ success: false, message: 'Aucune modification' });
     }
-
+ 
     values.push(userId);
     await pool.execute(
       `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
       values
     );
-
+ 
     res.json({ success: true, message: 'Utilisateur mis à jour' });
   } catch (err) {
     console.error('Erreur update user:', err);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const userId = req.params.id;
-
+ 
     const [admins] = await pool.execute(
       `SELECT id FROM users WHERE user_type = 'Administrateur' AND is_active = 1`
     );
@@ -819,18 +819,18 @@ app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, 
       `SELECT user_type FROM users WHERE id = ?`,
       [userId]
     );
-
+ 
     if (target.length === 0) {
       return res.status(404).json({ success: false, message: 'Utilisateur introuvable' });
     }
-
+ 
     if (target[0].user_type === 'Administrateur' && admins.length <= 1) {
       return res.status(400).json({
         success: false,
         message: 'Impossible de supprimer le dernier administrateur',
       });
     }
-
+ 
     await pool.execute('DELETE FROM users WHERE id = ?', [userId]);
     res.json({ success: true, message: 'Utilisateur supprimé' });
   } catch (err) {
@@ -838,9 +838,9 @@ app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, 
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== ADMIN : REMBOURSEMENTS ====================
-
+ 
 app.get('/api/admin/refunds', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.execute(
@@ -856,23 +856,23 @@ app.get('/api/admin/refunds', authMiddleware, adminMiddleware, async (req, res) 
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 app.patch('/api/admin/refunds/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const refundId = req.params.id;
     const { status, processed_by } = req.body;
-
+ 
     if (!['COMPLETED', 'REJECTED'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Statut invalide' });
     }
-
+ 
     await pool.execute(
       `UPDATE refunds
        SET status = ?, processed_by = ?, processed_at = NOW()
        WHERE id = ?`,
       [status, processed_by || null, refundId]
     );
-
+ 
     res.json({
       success: true,
       message: status === 'COMPLETED' ? 'Remboursement accepté' : 'Remboursement refusé',
@@ -882,9 +882,9 @@ app.patch('/api/admin/refunds/:id', authMiddleware, adminMiddleware, async (req,
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== ADMIN : PRIX ====================
-
+ 
 // Prix accessibles aux utilisateurs connectés (mobile)
 app.get('/api/mobile/prices', authMiddleware, async (req, res) => {
   try {
@@ -903,7 +903,7 @@ app.get('/api/mobile/prices', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 app.get('/api/admin/prices', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.execute('SELECT setting_key, setting_value FROM settings');
@@ -923,11 +923,11 @@ app.get('/api/admin/prices', authMiddleware, adminMiddleware, async (req, res) =
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 app.put('/api/admin/prices', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { petit_dejeuner, repas } = req.body;
-
+ 
     if (petit_dejeuner !== undefined) {
       await pool.execute(
         `INSERT INTO settings (setting_key, setting_value) VALUES ('price_petit_dejeuner', ?)
@@ -942,14 +942,14 @@ app.put('/api/admin/prices', authMiddleware, adminMiddleware, async (req, res) =
         [String(repas)]
       );
     }
-
+ 
     res.json({ success: true, message: 'Prix mis à jour' });
   } catch (err) {
     console.error('Erreur update prices:', err);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
+ 
 // ==================== AGENT : RAPPORT VENTES ====================
 app.get('/api/mobile/sales-report', authMiddleware, async (req, res) => {
   try {
@@ -959,7 +959,7 @@ app.get('/api/mobile/sales-report', authMiddleware, async (req, res) => {
        WHERE status = 'USED'
        GROUP BY type`
     );
-
+ 
     const [byDay] = await pool.execute(
       `SELECT DATE(used_at) as day, COUNT(*) as count, SUM(price) as total
        FROM tickets
@@ -967,7 +967,7 @@ app.get('/api/mobile/sales-report', authMiddleware, async (req, res) => {
        GROUP BY DATE(used_at)
        ORDER BY day DESC`
     );
-
+ 
     const [totals] = await pool.execute(
       `SELECT
          COUNT(*) as total_used,
@@ -975,13 +975,13 @@ app.get('/api/mobile/sales-report', authMiddleware, async (req, res) => {
        FROM tickets
        WHERE status = 'USED'`
     );
-
+ 
     const [today] = await pool.execute(
       `SELECT COUNT(*) as count, COALESCE(SUM(price), 0) as total
        FROM tickets
        WHERE status = 'USED' AND DATE(used_at) = CURDATE()`
     );
-
+ 
     res.json({
       success: true,
       report: {
@@ -996,16 +996,16 @@ app.get('/api/mobile/sales-report', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 });
-
-// ==================== PAYDUNYA (WAVE) ====================
+ 
+// ==================== PAYDUNYA (WAVE + FALLBACK CHECKOUT) ====================
 const PAYDUNYA_MODE = process.env.PAYDUNYA_MODE || 'test';
 const PAYDUNYA_BASE =
   PAYDUNYA_MODE === 'live'
     ? 'https://app.paydunya.com/api/v1'
     : 'https://app.paydunya.com/sandbox-api/v1';
-
+ 
 const PAYDUNYA_MIN_AMOUNT = 200;
-
+ 
 function paydunyaHeaders() {
   return {
     'Content-Type': 'application/json',
@@ -1014,42 +1014,59 @@ function paydunyaHeaders() {
     'PAYDUNYA-TOKEN': process.env.PAYDUNYA_TOKEN || '',
   };
 }
-
+ 
 app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
   try {
     const { user_id, type, quantity, payment_method, phone } = req.body;
-
+ 
     if (!user_id || !type || !quantity || quantity < 1) {
       return res.status(400).json({ success: false, message: 'Données invalides' });
     }
-
+ 
     if (payment_method !== 'Wave') {
       return res.status(400).json({
         success: false,
         message: 'Seul Wave est disponible pour le moment. Orange Money bientôt.',
       });
     }
-
+ 
     const allowedTypes = ['Petit-déjeuner', 'Repas'];
     if (!allowedTypes.includes(type)) {
       return res.status(400).json({ success: false, message: 'Type de ticket invalide' });
     }
-
-    const [priceRows] = await pool.execute(
-      `SELECT setting_key, setting_value FROM settings
-       WHERE setting_key IN ('price_petit_dejeuner', 'price_repas')`
-    );
-    const priceMap = {};
-    priceRows.forEach((r) => {
-      priceMap[r.setting_key] = parseInt(r.setting_value, 10);
-    });
-    const unitPrice =
-      type === 'Petit-déjeuner'
-        ? priceMap.price_petit_dejeuner || 50
-        : priceMap.price_repas || 100;
+ 
+    // Clés PayDunya présentes ?
+    if (
+      !process.env.PAYDUNYA_MASTER_KEY ||
+      !process.env.PAYDUNYA_PRIVATE_KEY ||
+      !process.env.PAYDUNYA_TOKEN
+    ) {
+      return res.status(500).json({
+        success: false,
+        message: 'Configuration PayDunya manquante sur le serveur (clés API)',
+      });
+    }
+ 
+    let unitPrice = type === 'Petit-déjeuner' ? 50 : 100;
+    try {
+      const [priceRows] = await pool.execute(
+        `SELECT setting_key, setting_value FROM settings
+         WHERE setting_key IN ('price_petit_dejeuner', 'price_repas')`
+      );
+      const priceMap = {};
+      priceRows.forEach((r) => {
+        priceMap[r.setting_key] = parseInt(r.setting_value, 10);
+      });
+      unitPrice =
+        type === 'Petit-déjeuner'
+          ? priceMap.price_petit_dejeuner || 50
+          : priceMap.price_repas || 100;
+    } catch (e) {
+      console.warn('settings indisponible, prix par défaut:', e.message);
+    }
+ 
     const totalAmount = unitPrice * quantity;
-
-    // ✅ Contrôle du minimum Wave (200 FCFA)
+ 
     if (totalAmount < PAYDUNYA_MIN_AMOUNT) {
       return res.status(400).json({
         success: false,
@@ -1057,23 +1074,33 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
           'Montant minimum Wave : 200 FCFA. Prenez au moins 2 repas (ou 4 petits-déjeuners).',
       });
     }
-
-    // ✅ Vérification du numéro Wave
-    const cleanPhone = (phone || '').replace(/\s+/g, '');
+ 
+    const cleanPhone = String(phone || '')
+      .replace(/\s+/g, '')
+      .replace(/^\+221/, '');
     if (!cleanPhone || cleanPhone.length < 9) {
       return res.status(400).json({
         success: false,
         message: 'Numéro Wave requis (ex: 77XXXXXXX)',
       });
     }
-
-    const [payResult] = await pool.execute(
-      `INSERT INTO payments (user_id, ticket_type, quantity, amount, payment_method, status)
-       VALUES (?, ?, ?, ?, ?, 'PENDING')`,
-      [user_id, type, quantity, totalAmount, payment_method]
-    );
-    const paymentId = payResult.insertId;
-
+ 
+    let paymentId;
+    try {
+      const [payResult] = await pool.execute(
+        `INSERT INTO payments (user_id, ticket_type, quantity, amount, payment_method, status)
+         VALUES (?, ?, ?, ?, ?, 'PENDING')`,
+        [user_id, type, quantity, totalAmount, payment_method]
+      );
+      paymentId = payResult.insertId;
+    } catch (e) {
+      console.error('INSERT payments:', e.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Table payments inaccessible: ' + e.message,
+      });
+    }
+ 
     const payload = {
       invoice: {
         total_amount: totalAmount,
@@ -1095,90 +1122,114 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
         return_url: 'https://ticket-resto-api.onrender.com/api/payments/success',
       },
     };
-
+ 
     const response = await fetch(`${PAYDUNYA_BASE}/checkout-invoice/create`, {
       method: 'POST',
       headers: paydunyaHeaders(),
       body: JSON.stringify(payload),
     });
     const data = await response.json();
-
+    console.log('PayDunya invoice:', JSON.stringify(data));
+ 
     if (data.response_code !== '00') {
       await pool.execute(`UPDATE payments SET status = 'FAILED' WHERE id = ?`, [paymentId]);
       return res.status(400).json({
         success: false,
-        message: data.response_text || 'Erreur PayDunya',
+        message: data.response_text || data.message || 'Erreur création facture PayDunya',
       });
     }
-
+ 
     await pool.execute(`UPDATE payments SET paydunya_token = ? WHERE id = ?`, [
       data.token,
       paymentId,
     ]);
-
-    // ✅ SoftPay Wave : redirection directe vers Wave
-    const fullName = req.user.full_name || 'Client Ticket Resto';
-    const email = req.user.email || 'client@ticketresto.sn';
-
-    const softpayUrl =
-      PAYDUNYA_MODE === 'live'
-        ? 'https://app.paydunya.com/api/v1/softpay/wave-senegal'
-        : 'https://app.paydunya.com/sandbox-api/v1/softpay/wave-senegal';
-
-    const softRes = await fetch(softpayUrl, {
-      method: 'POST',
-      headers: paydunyaHeaders(),
-      body: JSON.stringify({
-        wave_senegal_fullName: fullName,
-        wave_senegal_email: email,
-        wave_senegal_phone: cleanPhone,
-        wave_senegal_payment_token: data.token,
-      }),
-    });
-    const softData = await softRes.json();
-
-    if (!softData.success || !softData.url) {
-      await pool.execute(`UPDATE payments SET status = 'FAILED' WHERE id = ?`, [paymentId]);
-      return res.status(400).json({
-        success: false,
-        message: softData.message || 'Impossible de lancer le paiement Wave',
+ 
+    const fullName =
+      (req.user && (req.user.full_name || req.user.fullName)) || 'Client Ticket Resto';
+    const email = (req.user && req.user.email) || 'client@ticketresto.sn';
+ 
+    // SoftPay Wave
+    let softData = {};
+    try {
+      const softRes = await fetch(`${PAYDUNYA_BASE}/softpay/wave-senegal`, {
+        method: 'POST',
+        headers: paydunyaHeaders(),
+        body: JSON.stringify({
+          wave_senegal_fullName: fullName,
+          wave_senegal_email: email,
+          wave_senegal_phone: cleanPhone,
+          wave_senegal_payment_token: data.token,
+        }),
+      });
+      softData = await softRes.json();
+      console.log('SoftPay Wave:', JSON.stringify(softData));
+    } catch (e) {
+      console.error('SoftPay fetch error:', e.message);
+      softData = { success: false, message: e.message };
+    }
+ 
+    // SoftPay OK → URL Wave
+    if (softData.success && softData.url) {
+      return res.json({
+        success: true,
+        payment_id: paymentId,
+        payment_url: softData.url,
+        token: data.token,
+        amount: totalAmount,
+        message: softData.message || 'Redirection vers Wave',
       });
     }
-
-    res.json({
-      success: true,
-      payment_id: paymentId,
-      payment_url: softData.url, // URL Wave directe
-      token: data.token,
-      amount: totalAmount,
+ 
+    // Fallback : page checkout PayDunya (choisir Wave)
+    const checkoutUrl = data.response_text;
+    if (checkoutUrl) {
+      return res.json({
+        success: true,
+        payment_id: paymentId,
+        payment_url: checkoutUrl,
+        token: data.token,
+        amount: totalAmount,
+        message:
+          softData.message ||
+          'Ouvrez la page de paiement et choisissez Wave',
+      });
+    }
+ 
+    await pool.execute(`UPDATE payments SET status = 'FAILED' WHERE id = ?`, [paymentId]);
+    return res.status(400).json({
+      success: false,
+      message: softData.message || 'Impossible de lancer le paiement Wave',
     });
   } catch (err) {
     console.error('Erreur payments/init:', err);
-    res.status(500).json({ success: false, message: 'Erreur serveur' });
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Erreur serveur',
+    });
   }
 });
-
+ 
 app.post('/api/payments/paydunya/webhook', async (req, res) => {
   try {
     const body = req.body || {};
     const data = body.data || body;
     const token = data.token || body.token;
-
+ 
     if (!token) {
       return res.status(400).json({ success: false, message: 'Token manquant' });
     }
-
+ 
     const confirmRes = await fetch(`${PAYDUNYA_BASE}/checkout-invoice/confirm/${token}`, {
       method: 'GET',
       headers: paydunyaHeaders(),
     });
     const confirm = await confirmRes.json();
-
+ 
     const status = (confirm.status || '').toLowerCase();
     if (status !== 'completed') {
       return res.json({ success: true, message: 'Paiement non complété', status });
     }
-
+ 
     const [rows] = await pool.execute(
       `SELECT * FROM payments WHERE paydunya_token = ? LIMIT 1`,
       [token]
@@ -1186,24 +1237,24 @@ app.post('/api/payments/paydunya/webhook', async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Paiement introuvable' });
     }
-
+ 
     const payment = rows[0];
     if (payment.status === 'PAID') {
       return res.json({ success: true, message: 'Déjà traité' });
     }
-
+ 
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-
+ 
       await connection.execute(
         `UPDATE payments SET status = 'PAID', paid_at = NOW() WHERE id = ?`,
         [payment.id]
       );
-
+ 
       const createdTickets = [];
       const unitPrice = Number(payment.amount) / payment.quantity;
-
+ 
       for (let i = 0; i < payment.quantity; i++) {
         const ticketCode = generateTicketCode(payment.ticket_type);
         const [result] = await connection.execute(
@@ -1225,7 +1276,7 @@ app.post('/api/payments/paydunya/webhook', async (req, res) => {
           status: 'ACTIVE',
         });
       }
-
+ 
       await connection.execute(
         `INSERT INTO transactions (user_id, type, amount, description, reference_id)
          VALUES (?, 'ACHAT', ?, ?, ?)`,
@@ -1236,7 +1287,7 @@ app.post('/api/payments/paydunya/webhook', async (req, res) => {
           createdTickets[0]?.id || null,
         ]
       );
-
+ 
       await connection.commit();
       broadcast({
         type: 'TICKETS_BOUGHT',
@@ -1249,39 +1300,39 @@ app.post('/api/payments/paydunya/webhook', async (req, res) => {
     } finally {
       connection.release();
     }
-
+ 
     res.json({ success: true, message: 'Paiement validé, tickets créés' });
   } catch (err) {
     console.error('Erreur webhook PayDunya:', err);
-    res.status(500).json({ success: false, message: 'Erreur serveur' });
+    res.status(500).json({ success: false, message: err.message || 'Erreur serveur' });
   }
 });
-
+ 
 app.get('/api/payments/success', (req, res) => {
   res.send(
     '<h2>Paiement réussi</h2><p>Vous pouvez revenir dans l\'application Ticket Resto.</p>'
   );
 });
-
+ 
 app.get('/api/payments/cancel', (req, res) => {
   res.send(
     '<h2>Paiement annulé</h2><p>Vous pouvez revenir dans l\'application.</p>'
   );
 });
-
+ 
 // ==================== SANTÉ ====================
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', database: 'ticket_resto_db', time: new Date().toISOString() });
 });
-
+ 
 // ==================== ROUTE PANEL ADMIN ====================
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
+ 
 // ==================== DÉMARRAGE ====================
 const PORT = process.env.PORT || 3001;
-
+ 
 testConnection().then(() => {
   server.listen(PORT, () => {
     console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
@@ -1289,3 +1340,4 @@ testConnection().then(() => {
     console.log(`🔑 JWT Secret configuré`);
   });
 });
+ 
