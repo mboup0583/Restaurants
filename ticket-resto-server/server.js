@@ -182,7 +182,8 @@ app.post('/api/mobile/login', async (req, res) => {
     }
  
     const [rows] = await pool.execute(
-      'SELECT * FROM users WHERE email = ? AND is_active = 1',
+      `SELECT id, full_name, email, password, user_type, student_id, phone, is_active, created_at, updated_at
+       FROM users WHERE email = ? AND is_active = 1`,
       [email]
     );
  
@@ -196,13 +197,22 @@ app.post('/api/mobile/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect' });
     }
  
-    const { password: _, ...userWithoutPassword } = user;
-    const token = signToken(userWithoutPassword);
+    const token = signToken(user);
  
     res.json({
       success: true,
       message: 'Connexion réussie',
-      user: userWithoutPassword,
+      user: {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        user_type: user.user_type,
+        student_id: user.student_id,
+        phone: user.phone || null,
+        is_active: user.is_active,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+      },
       token,
     });
   } catch (err) {
@@ -352,7 +362,7 @@ app.post('/api/mobile/verify-and-register', async (req, res) => {
 // ==================== ROUTE REGISTER (ANCIENNE - GARDÉE POUR COMPATIBILITÉ) ====================
 app.post('/api/mobile/register', async (req, res) => {
   try {
-    const { full_name, email, password, user_type, student_id } = req.body;
+    const { full_name, email, password, user_type, student_id, phone } = req.body;
  
     if (!full_name || !email || !password || !user_type) {
       return res.status(400).json({ success: false, message: 'Champs obligatoires manquants' });
@@ -375,8 +385,16 @@ app.post('/api/mobile/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
  
     const [result] = await pool.execute(
-      `INSERT INTO users (full_name, email, password, user_type, student_id) VALUES (?, ?, ?, ?, ?)`,
-      [full_name, email, hashedPassword, user_type, student_id || null]
+      `INSERT INTO users (full_name, email, password, user_type, student_id, phone)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        full_name,
+        email,
+        hashedPassword,
+        user_type,
+        student_id || null,
+        phone ? String(phone).replace(/\s/g, '') : null,
+      ]
     );
  
     const newUser = {
@@ -385,6 +403,7 @@ app.post('/api/mobile/register', async (req, res) => {
       email,
       user_type,
       student_id: student_id || null,
+      phone: phone ? String(phone).replace(/\s/g, '') : null,
       is_active: 1
     };
  
@@ -1017,7 +1036,7 @@ function paydunyaHeaders() {
  
 app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
   try {
-    const { user_id, type, quantity, payment_method, phone } = req.body;
+    let { user_id, type, quantity, payment_method, phone } = req.body;
  
     if (!user_id || !type || !quantity || quantity < 1) {
       return res.status(400).json({ success: false, message: 'Données invalides' });
@@ -1029,6 +1048,25 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
         message: 'Seul Wave est disponible pour le moment. Orange Money bientôt.',
       });
     }
+ 
+    // Si pas de phone dans la requête → prendre celui en base
+    if (!phone || String(phone).trim() === '') {
+      const [rows] = await pool.execute(
+        'SELECT phone FROM users WHERE id = ?',
+        [user_id || req.user.id]
+      );
+      phone = rows[0]?.phone || null;
+    }
+ 
+    if (payment_method === 'Wave' && (!phone || String(phone).trim() === '')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aucun numéro de téléphone enregistré. Mets à jour ton profil ou réinscris-toi avec ton numéro Wave.',
+      });
+    }
+ 
+    // nettoyage
+    phone = String(phone).replace(/\s/g, '').replace(/^\+221/, '');
  
     const allowedTypes = ['Petit-déjeuner', 'Repas'];
     if (!allowedTypes.includes(type)) {
@@ -1075,15 +1113,7 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
       });
     }
  
-    const cleanPhone = String(phone || '')
-      .replace(/\s+/g, '')
-      .replace(/^\+221/, '');
-    if (!cleanPhone || cleanPhone.length < 9) {
-      return res.status(400).json({
-        success: false,
-        message: 'Numéro Wave requis (ex: 77XXXXXXX)',
-      });
-    }
+    const cleanPhone = phone;
  
     let paymentId;
     try {
@@ -1340,4 +1370,3 @@ testConnection().then(() => {
     console.log(`🔑 JWT Secret configuré`);
   });
 });
- 
