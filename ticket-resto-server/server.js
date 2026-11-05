@@ -1240,7 +1240,91 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
     });
   }
 });
- 
+
+// ==================== VÉRIFIER PAIEMENT (APRÈS RETOUR WAVE) ====================
+app.post('/api/mobile/payments/verify', authMiddleware, async (req, res) => {
+  try {
+    const { payment_id } = req.body;
+    const userId = req.user.id;
+
+    const [rows] = await pool.execute(
+      'SELECT * FROM payments WHERE id = ? AND user_id = ?',
+      [payment_id, userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Paiement introuvable' });
+    }
+
+    const payment = rows[0];
+
+    // Si le paiement a déjà été validé par le webhook, on s'arrête là
+    if (payment.status === 'PAID') {
+      return res.json({ success: true, message: 'Paiement déjà validé', tickets_created: true });
+    }
+
+    // Vérifier auprès de PayDunya
+    const confirmRes = await fetch(`${PAYDUNYA_BASE}/checkout-invoice/confirm/${payment.paydunya_token}`, {
+      method: 'GET',
+      headers: paydunyaHeaders(),
+    });
+    const confirm = await confirmRes.json();
+
+    if ((confirm.status || '').toLowerCase() !== 'completed') {
+      return res.status(400).json({ success: false, message: 'Le paiement n\'a pas été complété sur Wave.' });
+    }
+
+    // Paiement confirmé par PayDunya : on crée les tickets
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      await connection.execute(
+        `UPDATE payments SET status = 'PAID', paid_at = NOW() WHERE id = ?`,
+        [payment.id]
+      );
+
+      const createdTickets = [];
+      const unitPrice = Number(payment.amount) / payment.quantity;
+
+      for (let i = 0; i < payment.quantity; i++) {
+        const ticketCode = generateTicketCode(payment.ticket_type);
+        const [result] = await connection.execute(
+          `INSERT INTO tickets (ticket_code, type, user_id, price, payment_method, status)
+           VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
+          [ticketCode, payment.ticket_type, payment.user_id, unitPrice, payment.payment_method]
+        );
+        createdTickets.push({
+          id: result.insertId,
+          ticket_code: ticketCode,
+          type: payment.ticket_type,
+          price: unitPrice,
+          status: 'ACTIVE',
+        });
+      }
+
+      await connection.execute(
+        `INSERT INTO transactions (user_id, type, amount, description, reference_id)
+         VALUES (?, 'ACHAT', ?, ?, ?)`,
+        [payment.user_id, payment.amount, `Achat de ${payment.quantity} ticket(s) ${payment.ticket_type} (Wave)`, createdTickets[0]?.id || null]
+      );
+
+      await connection.commit();
+      broadcast({ type: 'TICKETS_BOUGHT', user_id: payment.user_id, tickets: createdTickets });
+
+      res.json({ success: true, message: 'Paiement validé, tickets créés', tickets_created: true });
+    } catch (e) {
+      await connection.rollback();
+      throw e;
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    console.error('Erreur verify payment:', err);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
 app.post('/api/payments/paydunya/webhook', async (req, res) => {
   try {
     const body = req.body || {};
