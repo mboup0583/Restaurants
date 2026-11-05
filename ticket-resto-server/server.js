@@ -224,7 +224,7 @@ app.post('/api/mobile/login', async (req, res) => {
 // ==================== ENVOI CODE VÉRIFICATION ====================
 app.post('/api/mobile/send-verification-code', async (req, res) => {
   try {
-    const { full_name, email, password, user_type, student_id } = req.body;
+    const { full_name, email, password, user_type, student_id, phone } = req.body;
  
     if (!full_name || !email || !password || !user_type) {
       return res.status(400).json({ success: false, message: 'Champs obligatoires manquants' });
@@ -251,6 +251,7 @@ app.post('/api/mobile/send-verification-code', async (req, res) => {
       password,
       user_type,
       student_id: student_id || null,
+      phone: phone ? String(phone).replace(/\s/g, '') : null,
       code,
       expires: Date.now() + 15 * 60 * 1000,
     });
@@ -328,8 +329,8 @@ app.post('/api/mobile/verify-and-register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(stored.password, 10);
  
     const [result] = await pool.execute(
-      `INSERT INTO users (full_name, email, password, user_type, student_id) VALUES (?, ?, ?, ?, ?)`,
-      [stored.full_name, email, hashedPassword, stored.user_type, stored.student_id]
+      `INSERT INTO users (full_name, email, password, user_type, student_id, phone) VALUES (?, ?, ?, ?, ?, ?)`,
+      [stored.full_name, email, hashedPassword, stored.user_type, stored.student_id, stored.phone]
     );
  
     const newUser = {
@@ -338,6 +339,7 @@ app.post('/api/mobile/verify-and-register', async (req, res) => {
       email,
       user_type: stored.user_type,
       student_id: stored.student_id,
+      phone: stored.phone,
       is_active: 1
     };
  
