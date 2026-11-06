@@ -1247,6 +1247,10 @@ app.post('/api/mobile/payments/verify', authMiddleware, async (req, res) => {
     const { payment_id } = req.body;
     const userId = req.user.id;
 
+    if (!payment_id) {
+      return res.status(400).json({ success: false, message: 'payment_id requis' });
+    }
+
     const [rows] = await pool.execute(
       'SELECT * FROM payments WHERE id = ? AND user_id = ?',
       [payment_id, userId]
@@ -1258,29 +1262,51 @@ app.post('/api/mobile/payments/verify', authMiddleware, async (req, res) => {
 
     const payment = rows[0];
 
-    // Si le paiement a déjà été validé par le webhook, on s'arrête là
-    if (payment.status === 'PAID') {
-      return res.json({ success: true, message: 'Paiement déjà validé', tickets_created: true });
+    if (!payment.paydunya_token) {
+      return res.status(400).json({ success: false, message: 'Token PayDunya manquant' });
     }
 
-    // Vérifier auprès de PayDunya
-    const confirmRes = await fetch(`${PAYDUNYA_BASE}/checkout-invoice/confirm/${payment.paydunya_token}`, {
-      method: 'GET',
-      headers: paydunyaHeaders(),
-    });
+    const confirmRes = await fetch(
+      `${PAYDUNYA_BASE}/checkout-invoice/confirm/${payment.paydunya_token}`,
+      { method: 'GET', headers: paydunyaHeaders() }
+    );
     const confirm = await confirmRes.json();
+    console.log('PayDunya confirm payment', payment_id, JSON.stringify(confirm));
 
-    if ((confirm.status || '').toLowerCase() !== 'completed') {
-      return res.status(400).json({ success: false, message: 'Le paiement n\'a pas été complété sur Wave.' });
+    const status = (confirm.status || '').toLowerCase();
+    if (status !== 'completed') {
+      return res.json({
+        success: false,
+        pending: true,
+        message: 'Paiement pas encore complété',
+        status,
+      });
     }
 
-    // Paiement confirmé par PayDunya : on crée les tickets
+    // Anti-doublon : si le paiement est déjà PAID et que les tickets existent, on s'arrête
+    if (payment.status === 'PAID') {
+      const [tix] = await pool.execute(
+        `SELECT id, ticket_code, type, price, status FROM tickets
+         WHERE user_id = ? AND type = ? AND payment_method = ?
+         ORDER BY id DESC LIMIT ?`,
+        [payment.user_id, payment.ticket_type, payment.payment_method, payment.quantity]
+      );
+      if (tix.length >= payment.quantity) {
+        return res.json({
+          success: true,
+          message: 'Déjà validé',
+          tickets_created: true,
+          tickets: tix,
+        });
+      }
+    }
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
 
       await connection.execute(
-        `UPDATE payments SET status = 'PAID', paid_at = NOW() WHERE id = ?`,
+        `UPDATE payments SET status = 'PAID', paid_at = COALESCE(paid_at, NOW()) WHERE id = ?`,
         [payment.id]
       );
 
@@ -1292,7 +1318,13 @@ app.post('/api/mobile/payments/verify', authMiddleware, async (req, res) => {
         const [result] = await connection.execute(
           `INSERT INTO tickets (ticket_code, type, user_id, price, payment_method, status)
            VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
-          [ticketCode, payment.ticket_type, payment.user_id, unitPrice, payment.payment_method]
+          [
+            ticketCode,
+            payment.ticket_type,
+            payment.user_id,
+            unitPrice,
+            payment.payment_method,
+          ]
         );
         createdTickets.push({
           id: result.insertId,
@@ -1306,13 +1338,27 @@ app.post('/api/mobile/payments/verify', authMiddleware, async (req, res) => {
       await connection.execute(
         `INSERT INTO transactions (user_id, type, amount, description, reference_id)
          VALUES (?, 'ACHAT', ?, ?, ?)`,
-        [payment.user_id, payment.amount, `Achat de ${payment.quantity} ticket(s) ${payment.ticket_type} (Wave)`, createdTickets[0]?.id || null]
+        [
+          payment.user_id,
+          payment.amount,
+          `Achat de ${payment.quantity} ticket(s) ${payment.ticket_type} (Wave)`,
+          createdTickets[0]?.id || null,
+        ]
       );
 
       await connection.commit();
-      broadcast({ type: 'TICKETS_BOUGHT', user_id: payment.user_id, tickets: createdTickets });
+      broadcast({
+        type: 'TICKETS_BOUGHT',
+        user_id: payment.user_id,
+        tickets: createdTickets,
+      });
 
-      res.json({ success: true, message: 'Paiement validé, tickets créés', tickets_created: true });
+      res.json({
+        success: true,
+        message: 'Paiement validé, tickets créés',
+        tickets_created: true,
+        tickets: createdTickets,
+      });
     } catch (e) {
       await connection.rollback();
       throw e;
@@ -1321,7 +1367,7 @@ app.post('/api/mobile/payments/verify', authMiddleware, async (req, res) => {
     }
   } catch (err) {
     console.error('Erreur verify payment:', err);
-    res.status(500).json({ success: false, message: 'Erreur serveur' });
+    res.status(500).json({ success: false, message: err.message || 'Erreur serveur' });
   }
 });
 
