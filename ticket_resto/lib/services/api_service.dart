@@ -67,6 +67,7 @@ class ApiService {
     required String password,
     required String userType,
     String? studentId,
+    String? phone,
   }) async {
     try {
       final response = await http.post(
@@ -78,6 +79,7 @@ class ApiService {
           'password': password,
           'user_type': userType,
           'student_id': studentId,
+          'phone': phone,
         }),
       );
 
@@ -247,6 +249,71 @@ class ApiService {
     }
   }
 
+  // ==================== MODIFIER MOT DE PASSE (ADMIN) ====================
+  static Future<Map<String, dynamic>> updateUserPassword({
+    required int userId,
+    required String newPassword,
+    String? token,
+  }) async {
+    try {
+      final headers = await _headers(withAuth: true, token: token);
+      final response = await http.patch(
+        Uri.parse('${AppConstants.baseUrl}/api/admin/users/$userId'),
+        headers: headers,
+        body: jsonEncode({'password': newPassword}),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Mot de passe modifié',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Erreur lors de la modification',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Impossible de contacter le serveur.',
+      };
+    }
+  }
+
+  // ==================== SUPPRIMER UTILISATEUR (ADMIN) ====================
+  static Future<Map<String, dynamic>> deleteUser(int userId, {String? token}) async {
+    try {
+      final headers = await _headers(withAuth: true, token: token);
+      final response = await http.delete(
+        Uri.parse('${AppConstants.baseUrl}/api/admin/users/$userId'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Utilisateur supprimé',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Erreur lors de la suppression',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Impossible de contacter le serveur.',
+      };
+    }
+  }
+
   // ==================== DEMANDER UN REMBOURSEMENT ====================
   static Future<Map<String, dynamic>> refundTicket({
     required int userId,
@@ -394,6 +461,7 @@ class ApiService {
     required String password,
     required String userType,
     String? studentId,
+    String? phone,
   }) async {
     try {
       final response = await http.post(
@@ -405,6 +473,7 @@ class ApiService {
           'password': password,
           'user_type': userType,
           'student_id': studentId,
+          'phone': phone,
         }),
       );
 
@@ -473,7 +542,7 @@ class ApiService {
     try {
       final headers = await _headers(withAuth: true, token: token);
       final response = await http.get(
-        Uri.parse('${AppConstants.baseUrl}/api/mobile/prices'), // ✅ Route mobile
+        Uri.parse('${AppConstants.baseUrl}/api/mobile/prices'),
         headers: headers,
       );
 
@@ -526,6 +595,84 @@ class ApiService {
         'success': false,
         'message': 'Impossible de contacter le serveur.',
       };
+    }
+  }
+
+  // ==================== INITIER PAIEMENT PAYDUNYA (WAVE) ====================
+  static Future<Map<String, dynamic>> initPayment({
+    required int userId,
+    required String type,
+    required int quantity,
+    required String paymentMethod,
+    String? phone,
+    String? token,
+  }) async {
+    try {
+      final headers = await _headers(withAuth: true, token: token);
+      final body = <String, dynamic>{
+        'user_id': userId,
+        'type': type,
+        'quantity': quantity,
+        'payment_method': paymentMethod,
+      };
+      if (phone != null && phone.trim().isNotEmpty) {
+        body['phone'] = phone.trim();
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/api/mobile/payments/init'),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'payment_id': data['payment_id'],
+          'payment_url': data['payment_url'],
+          'token': data['token'],
+          'amount': data['amount'],
+          'message': data['message'] ?? 'Paiement initialisé',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Erreur lors de l\'initialisation du paiement',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Impossible de contacter le serveur.',
+      };
+    }
+  }
+
+  // ==================== VÉRIFIER PAIEMENT (APRÈS RETOUR WAVE) ====================
+  static Future<Map<String, dynamic>> verifyPayment({
+    required int paymentId,
+    String? token,
+  }) async {
+    try {
+      final headers = await _headers(withAuth: true, token: token);
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/api/mobile/payments/verify'),
+        headers: headers,
+        body: jsonEncode({'payment_id': paymentId}),
+      );
+
+      final data = jsonDecode(response.body);
+      return {
+        'success': data['success'] == true,
+        'pending': data['pending'] == true,
+        'message': data['message'],
+        'tickets_created': data['tickets_created'] == true,
+        'tickets': data['tickets'],
+      };
+    } catch (e) {
+      return {'success': false, 'pending': true, 'message': e.toString()};
     }
   }
 }

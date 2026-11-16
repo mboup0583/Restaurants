@@ -29,6 +29,7 @@ class AuthProvider with ChangeNotifier {
       final fullName = prefs.getString(AppConstants.keyUserFullName);
       final userType = prefs.getString(AppConstants.keyUserType);
       final studentId = prefs.getString(AppConstants.keyStudentId);
+      final phone = prefs.getString(AppConstants.keyUserPhone);
       final token = prefs.getString(AppConstants.keyToken);
 
       print('📂 [loadUserFromStorage] Token chargé: ${token != null ? "✅ OUI" : "❌ NON"}');
@@ -41,6 +42,7 @@ class AuthProvider with ChangeNotifier {
           email: email,
           userType: userType,
           studentId: studentId,
+          phone: phone,
         );
         print('👤 [loadUserFromStorage] Utilisateur chargé: ${fullName}');
         notifyListeners();
@@ -64,6 +66,7 @@ class AuthProvider with ChangeNotifier {
     if (user.studentId != null) {
       await prefs.setString(AppConstants.keyStudentId, user.studentId!);
     }
+    await prefs.setString(AppConstants.keyUserPhone, user.phone ?? '');
     if (token != null) {
       await prefs.setString(AppConstants.keyToken, token);
       _token = token;
@@ -81,14 +84,14 @@ class AuthProvider with ChangeNotifier {
 
     print('📡 [login] Tentative de connexion...');
     print('📧 [login] Email: $email');
-    
+
     final result = await ApiService.login(email, password);
 
     _isLoading = false;
 
     print('📡 [login] Résultat - success: ${result['success']}');
     print('📡 [login] Token présent: ${result['token'] != null}');
-    
+
     if (result['token'] != null) {
       print('🔑 [login] Token: ${result['token']}');
     }
@@ -96,18 +99,17 @@ class AuthProvider with ChangeNotifier {
     if (result['success'] == true) {
       _currentUser = result['user'] as User;
       final token = result['token'] as String?;
-      
+
       print('💾 [login] Sauvegarde du token...');
       await _saveUserToStorage(_currentUser!, token: token);
-      
-      // Vérifier que le token est bien sauvegardé
+
       final prefs = await SharedPreferences.getInstance();
       final savedToken = prefs.getString(AppConstants.keyToken);
       print('🔑 [login] Token sauvegardé: ${savedToken != null ? "✅ OUI" : "❌ NON"}');
       if (savedToken != null) {
         print('🔑 [login] Token sauvegardé: ${savedToken.substring(0, 20)}...');
       }
-      
+
       notifyListeners();
       print('✅ [login] Connexion réussie pour ${_currentUser?.fullName}');
       return true;
@@ -126,6 +128,7 @@ class AuthProvider with ChangeNotifier {
     required String password,
     required String userType,
     String? studentId,
+    String? phone,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -141,6 +144,7 @@ class AuthProvider with ChangeNotifier {
       password: password,
       userType: userType,
       studentId: studentId,
+      phone: phone,
     );
 
     _isLoading = false;
@@ -151,15 +155,14 @@ class AuthProvider with ChangeNotifier {
     if (result['success'] == true) {
       _currentUser = result['user'] as User;
       final token = result['token'] as String?;
-      
+
       print('💾 [register] Sauvegarde du token...');
       await _saveUserToStorage(_currentUser!, token: token);
-      
-      // Vérifier que le token est bien sauvegardé
+
       final prefs = await SharedPreferences.getInstance();
       final savedToken = prefs.getString(AppConstants.keyToken);
       print('🔑 [register] Token sauvegardé: ${savedToken != null ? "✅ OUI" : "❌ NON"}');
-      
+
       notifyListeners();
       print('✅ [register] Inscription réussie pour $_currentUser?.fullName');
       return true;

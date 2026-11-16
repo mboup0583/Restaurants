@@ -21,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _studentIdController = TextEditingController();
+  final _phoneController = TextEditingController();
 
   String _selectedUserType = 'Étudiant';
   bool _obscurePassword = true;
@@ -38,13 +39,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _studentIdController.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  // Valide un numéro sénégalais : commence par 7X puis 7 chiffres
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Numéro de téléphone obligatoire';
+    }
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    // Accepte 9 chiffres (7XXXXXXXX) ou 12 chiffres avec indicatif 221 (2217XXXXXXXX)
+    String local = digits;
+    if (local.startsWith('221')) {
+      local = local.substring(3);
+    }
+    if (local.length != 9) {
+      return 'Numéro invalide (ex: 77 123 45 67)';
+    }
+    if (!local.startsWith('7')) {
+      return 'Le numéro doit commencer par 7X';
+    }
+    return null;
   }
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
+
+    // Normaliser le numéro : garder les 9 chiffres
+    String phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (phoneDigits.startsWith('221')) {
+      phoneDigits = phoneDigits.substring(3);
+    }
 
     final result = await ApiService.sendVerificationCode(
       fullName: _fullNameController.text.trim(),
@@ -54,13 +82,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       studentId: _selectedUserType == 'Étudiant'
           ? _studentIdController.text.trim()
           : null,
+      phone: phoneDigits,
     );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (result['success'] == true) {
-      // Afficher le dialogue de saisie du code
       _showCodeDialog(
         email: _emailController.text.trim(),
         debugCode: result['debug_code'],
@@ -161,7 +189,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             // Sauvegarder la session
                             final authProvider =
                                 Provider.of<AuthProvider>(context, listen: false);
-                            // On utilise login logic via stockage manuel
                             await authProvider.login(email, _passwordController.text);
 
                             if (!context.mounted) return;
@@ -312,6 +339,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(9),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Numéro Wave / téléphone',
+                    hintText: '7X XXX XX XX',
+                    prefixIcon: const Icon(Icons.phone),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: _validatePhone,
                 ),
                 const SizedBox(height: 16),
 

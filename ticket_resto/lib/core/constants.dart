@@ -4,7 +4,9 @@ class AppConstants {
   // Pour un téléphone physique → IP de ton PC (ex: 192.168.1.67)
   //static const String baseUrl = 'http://10.0.2.2:3001';
 
-  static const String baseUrl = 'http://192.168.1.5:3001';
+  //static const String baseUrl = 'http://192.168.1.5:3001';
+    static const String baseUrl = 'https://ticket-resto-api.onrender.com';
+
 
   // Endpoints
   static const String loginEndpoint = '/api/mobile/login';
@@ -24,4 +26,6 @@ class AppConstants {
   static const String keyStudentId = 'student_id';
   static const String keyIsLoggedIn = 'is_logged_in';
   static const String keyToken = 'auth_token'; // ✅ Ajouté
+
+  static const String keyUserPhone = 'user_phone';
 }

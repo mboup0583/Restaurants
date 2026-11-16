@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'ticket_qr_screen.dart';
@@ -31,6 +32,18 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final userId = authProvider.currentUser!.id;
 
+    // Vérifier s'il y a un paiement en attente non finalisé
+    final prefs = await SharedPreferences.getInstance();
+    final pendingId = prefs.getInt('pending_payment_id');
+    
+    if (pendingId != null) {
+      final v = await ApiService.verifyPayment(paymentId: pendingId);
+      if (v['success'] == true && v['tickets_created'] == true) {
+        await prefs.remove('pending_payment_id');
+      }
+    }
+
+    // Ensuite, on charge les tickets
     final result = await ApiService.getMyTickets(userId);
 
     if (!mounted) return;

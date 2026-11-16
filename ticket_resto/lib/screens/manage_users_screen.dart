@@ -78,6 +78,176 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     }
   }
 
+  void _onUserTap(Map<String, dynamic> user) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                title: Text(
+                  user['full_name'] ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(user['email'] ?? ''),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.lock_reset, color: Colors.indigo),
+                title: const Text('Modifier le mot de passe'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showChangePasswordDialog(user);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Supprimer l\'utilisateur'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDelete(user);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showChangePasswordDialog(Map<String, dynamic> user) async {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('Mot de passe — ${user['full_name']}'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Nouveau mot de passe',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) {
+                if (v == null || v.length < 6) {
+                  return 'Au moins 6 caractères';
+                }
+                return null;
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepOrange,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(ctx, true);
+                }
+              },
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final result = await ApiService.updateUserPassword(
+      userId: user['id'] is int ? user['id'] as int : int.parse(user['id'].toString()),
+      newPassword: controller.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['message'] ??
+              (result['success'] == true ? 'Mot de passe modifié' : 'Erreur'),
+        ),
+        backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(Map<String, dynamic> user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Supprimer ?'),
+          content: Text(
+            'Supprimer définitivement « ${user['full_name']} » (${user['email']}) ?\n\nCette action est irréversible.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final result = await ApiService.deleteUser(
+      user['id'] is int ? user['id'] as int : int.parse(user['id'].toString()),
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['message'] ??
+              (result['success'] == true ? 'Utilisateur supprimé' : 'Erreur'),
+        ),
+        backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+      ),
+    );
+
+    if (result['success'] == true) {
+      _loadUsers();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -94,7 +264,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       ),
       body: Column(
         children: [
-          // Filtres
           SizedBox(
             height: 50,
             child: ListView.builder(
@@ -118,8 +287,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
               },
             ),
           ),
-
-          // Liste
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -150,7 +317,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                               padding: const EdgeInsets.all(12),
                               itemCount: _filteredUsers.length,
                               itemBuilder: (context, index) {
-                                final user = _filteredUsers[index];
+                                final user = Map<String, dynamic>.from(
+                                  _filteredUsers[index] as Map,
+                                );
                                 final type = user['user_type'] ?? '';
                                 final isActive = user['is_active'] == 1 ||
                                     user['is_active'] == true;
@@ -193,7 +362,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                         Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.symmetric(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
                                                 horizontal: 8,
                                                 vertical: 2,
                                               ),
@@ -221,7 +391,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                                   vertical: 2,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.red.withOpacity(0.15),
+                                                  color: Colors.red
+                                                      .withOpacity(0.15),
                                                   borderRadius:
                                                       BorderRadius.circular(8),
                                                 ),
@@ -239,6 +410,8 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                       ],
                                     ),
                                     isThreeLine: true,
+                                    trailing: const Icon(Icons.more_vert),
+                                    onTap: () => _onUserTap(user),
                                   ),
                                 );
                               },

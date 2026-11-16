@@ -4,6 +4,7 @@ class User {
   final String email;
   final String userType;
   final String? studentId;
+  final String? phone;
   final bool isActive;
 
   User({
@@ -12,6 +13,7 @@ class User {
     required this.email,
     required this.userType,
     this.studentId,
+    this.phone,
     this.isActive = true,
   });
 
@@ -23,6 +25,7 @@ class User {
       email: json['email'] as String,
       userType: json['user_type'] as String,
       studentId: json['student_id'] as String?,
+      phone: json['phone'] as String?,
       isActive: json['is_active'] == 1 || json['is_active'] == true,
     );
   }
@@ -35,6 +38,7 @@ class User {
       'email': email,
       'user_type': userType,
       'student_id': studentId,
+      'phone': phone,
       'is_active': isActive,
     };
   }
