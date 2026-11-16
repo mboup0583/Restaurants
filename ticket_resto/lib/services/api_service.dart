@@ -179,11 +179,11 @@ class ApiService {
     }
   }
 
-  // ==================== TRANSFÉRER UN TICKET ====================
-  static Future<Map<String, dynamic>> transferTicket({
+  // ==================== TRANSFÉRER UN OU PLUSIEURS TICKETS ====================
+  static Future<Map<String, dynamic>> transferTickets({
     required int fromUserId,
     required int toUserId,
-    required int ticketId,
+    required List<int> ticketIds,
     String? token,
   }) async {
     try {
@@ -194,7 +194,7 @@ class ApiService {
         body: jsonEncode({
           'from_user_id': fromUserId,
           'to_user_id': toUserId,
-          'ticket_id': ticketId,
+          'ticket_ids': ticketIds,
         }),
       );
 
@@ -203,7 +203,7 @@ class ApiService {
       if (response.statusCode == 200 && data['success'] == true) {
         return {
           'success': true,
-          'message': data['message'] ?? 'Ticket transféré avec succès',
+          'message': data['message'] ?? 'Tickets transférés avec succès',
         };
       } else {
         return {
@@ -217,6 +217,20 @@ class ApiService {
         'message': 'Impossible de contacter le serveur.',
       };
     }
+  }
+
+  static Future<Map<String, dynamic>> transferTicket({
+    required int fromUserId,
+    required int toUserId,
+    required int ticketId,
+    String? token,
+  }) async {
+    return transferTickets(
+      fromUserId: fromUserId,
+      toUserId: toUserId,
+      ticketIds: [ticketId],
+      token: token,
+    );
   }
 
   // ==================== LISTE DES UTILISATEURS ====================

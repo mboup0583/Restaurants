@@ -15,7 +15,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
   bool _isLoading = true;
   bool _isTransferring = false;
   String? _error;
-  int? _selectedTicketId;
+  final Set<int> _selectedTicketIds = {};
   final _emailController = TextEditingController();
 
   @override
@@ -53,10 +53,46 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
     });
   }
 
+  void _toggleTicket(int ticketId) {
+    setState(() {
+      if (_selectedTicketIds.contains(ticketId)) {
+        _selectedTicketIds.remove(ticketId);
+      } else {
+        _selectedTicketIds.add(ticketId);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedTicketIds.length == _activeTickets.length) {
+        _selectedTicketIds.clear();
+      } else {
+        _selectedTicketIds.clear();
+        for (final t in _activeTickets) {
+          _selectedTicketIds.add(t['id'] as int);
+        }
+      }
+    });
+  }
+
+  double _calculateTotalSelected() {
+    double total = 0;
+    for (final t in _activeTickets) {
+      if (_selectedTicketIds.contains(t['id'])) {
+        total += (double.tryParse(t['price'].toString()) ?? 0);
+      }
+    }
+    return total;
+  }
+
   Future<void> _handleTransfer() async {
-    if (_selectedTicketId == null) {
+    if (_selectedTicketIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sélectionnez un ticket'), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text('Sélectionnez au moins un ticket à transférer'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -64,7 +100,10 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email invalide'), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text('Veuillez saisir un email valide pour le destinataire'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -86,7 +125,10 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
       if (recipient == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Aucun utilisateur avec cet email'), backgroundColor: Colors.red),
+            const SnackBar(
+              content: Text('Aucun utilisateur avec cet email'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         return;
@@ -97,27 +139,36 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
 
       if (toUserId == fromUserId) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible de se transférer à soi-même'), backgroundColor: Colors.orange),
+          const SnackBar(
+            content: Text('Impossible de se transférer des tickets à soi-même'),
+            backgroundColor: Colors.orange,
+          ),
         );
         return;
       }
 
-      final result = await ApiService.transferTicket(
+      final result = await ApiService.transferTickets(
         fromUserId: fromUserId,
         toUserId: toUserId,
-        ticketId: _selectedTicketId!,
+        ticketIds: _selectedTicketIds.toList(),
       );
 
       if (!mounted) return;
 
       if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text(result['message'] ?? 'Tickets transférés avec succès'),
+            backgroundColor: Colors.green,
+          ),
         );
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(result['message'] ?? 'Erreur lors du transfert'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
@@ -133,10 +184,13 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final allSelected = _activeTickets.isNotEmpty && _selectedTicketIds.length == _activeTickets.length;
+    final totalSelected = _calculateTotalSelected();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text('Transférer un ticket'),
+        title: const Text('Transférer des tickets'),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
       ),
@@ -149,24 +203,78 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _stepTitle('1', 'Choisissez un ticket actif'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: _stepTitle(
+                              '1',
+                              'Sélectionnez les tickets (${_selectedTicketIds.length}/${_activeTickets.length})',
+                            ),
+                          ),
+                          if (_activeTickets.isNotEmpty)
+                            TextButton.icon(
+                              onPressed: _toggleSelectAll,
+                              icon: Icon(
+                                allSelected ? Icons.check_box : Icons.check_box_outline_blank,
+                                size: 18,
+                                color: Colors.indigo,
+                              ),
+                              label: Text(
+                                allSelected ? 'Tout désélectionner' : 'Tout cocher',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.indigo,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
+
+                      if (_selectedTicketIds.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.indigo.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.indigo.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.confirmation_number_outlined, size: 20, color: Colors.indigo),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${_selectedTicketIds.length} ticket(s) sélectionné(s) • Total: ${totalSelected.toStringAsFixed(0)} FCFA',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.indigo,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
                       if (_activeTickets.isEmpty)
                         _emptyBox('Aucun ticket actif à transférer')
                       else
                         ..._activeTickets.map((ticket) {
-                          final selected = _selectedTicketId == ticket['id'];
+                          final ticketId = ticket['id'] as int;
+                          final selected = _selectedTicketIds.contains(ticketId);
                           final isPdj = ticket['type'] == 'Petit-déjeuner';
                           return _ticketChoiceCard(
                             ticket: ticket,
                             selected: selected,
                             isPdj: isPdj,
-                            onTap: () => setState(() => _selectedTicketId = ticket['id']),
+                            onTap: () => _toggleTicket(ticketId),
                           );
                         }),
 
                       const SizedBox(height: 28),
-                      _stepTitle('2', 'Email du destinataire'),
+                      _stepTitle('2', 'Email de l\'ami(e) destinataire'),
                       const SizedBox(height: 12),
                       Container(
                         decoration: BoxDecoration(
@@ -185,7 +293,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             labelText: 'Email du destinataire',
-                            hintText: 'exemple@zig.univ.sn',
+                            hintText: 'ami@zig.univ.sn',
                             prefixIcon: const Icon(Icons.email_outlined),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -202,10 +310,11 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: (_isTransferring || _activeTickets.isEmpty) ? null : _handleTransfer,
+                          onPressed: (_isTransferring || _selectedTicketIds.isEmpty) ? null : _handleTransfer,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.indigo,
                             foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey.shade300,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
                           child: _isTransferring
@@ -214,7 +323,14 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
                                   height: 24,
                                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                                 )
-                              : const Text('Transférer le ticket', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                              : Text(
+                                  _selectedTicketIds.isEmpty
+                                      ? 'Sélectionnez un ou plusieurs tickets'
+                                      : _selectedTicketIds.length == 1
+                                          ? 'Transférer 1 ticket'
+                                          : 'Transférer les ${_selectedTicketIds.length} tickets (${totalSelected.toStringAsFixed(0)} FCFA)',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                ),
                         ),
                       ),
                       const SizedBox(height: 30),
@@ -233,7 +349,9 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
           child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
         ),
         const SizedBox(width: 10),
-        Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Expanded(
+          child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        ),
       ],
     );
   }
@@ -273,9 +391,22 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
           backgroundColor: color.withOpacity(0.15),
           child: Icon(isPdj ? Icons.free_breakfast : Icons.restaurant, color: color),
         ),
-        title: Text(ticket['type'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('${ticket['price']} FCFA'),
-        trailing: selected ? Icon(Icons.check_circle, color: color) : null,
+        title: Row(
+          children: [
+            Text(ticket['type'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            Text(
+              '#${ticket['id']}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+        subtitle: Text('${ticket['price']} FCFA • Code: ${ticket['ticket_code']}'),
+        trailing: Icon(
+          selected ? Icons.check_box : Icons.check_box_outline_blank,
+          color: selected ? color : Colors.grey.shade400,
+          size: 26,
+        ),
       ),
     );
   }

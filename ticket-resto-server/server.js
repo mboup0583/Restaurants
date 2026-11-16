@@ -574,68 +574,84 @@ app.post('/api/mobile/tickets/validate', authMiddleware, async (req, res) => {
  
 app.post('/api/mobile/tickets/transfer', authMiddleware, async (req, res) => {
   try {
-    const { from_user_id, to_user_id, ticket_id } = req.body;
- 
-    if (!from_user_id || !to_user_id || !ticket_id) {
-      return res.status(400).json({ success: false, message: 'Données manquantes' });
+    const { from_user_id, to_user_id, ticket_id, ticket_ids } = req.body;
+
+    let targetTicketIds = [];
+    if (Array.isArray(ticket_ids) && ticket_ids.length > 0) {
+      targetTicketIds = ticket_ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+    } else if (ticket_id) {
+      targetTicketIds = [parseInt(ticket_id, 10)];
     }
- 
-    if (from_user_id === to_user_id) {
+
+    if (!from_user_id || !to_user_id || targetTicketIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Données manquantes ou aucun ticket sélectionné' });
+    }
+
+    if (parseInt(from_user_id, 10) === parseInt(to_user_id, 10)) {
       return res.status(400).json({ success: false, message: 'Impossible de se transférer à soi-même' });
     }
- 
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
- 
-      const [tickets] = await connection.execute(
-        'SELECT * FROM tickets WHERE id = ? AND user_id = ? AND status = "ACTIVE"',
-        [ticket_id, from_user_id]
-      );
- 
-      if (tickets.length === 0) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Ticket introuvable ou non transferable' });
-      }
- 
+
       const [users] = await connection.execute(
-        'SELECT id FROM users WHERE id = ? AND is_active = 1',
+        'SELECT id, full_name, email FROM users WHERE id = ? AND is_active = 1',
         [to_user_id]
       );
- 
+
       if (users.length === 0) {
         await connection.rollback();
-        return res.status(404).json({ success: false, message: 'Destinataire introuvable' });
+        return res.status(404).json({ success: false, message: 'Destinataire introuvable ou inactif' });
       }
- 
-      await connection.execute(
-        `UPDATE tickets SET user_id = ?, status = 'TRANSFERRED' WHERE id = ?`,
-        [to_user_id, ticket_id]
+
+      const placeholders = targetTicketIds.map(() => '?').join(',');
+      const [tickets] = await connection.query(
+        `SELECT id, ticket_code, type, price FROM tickets WHERE id IN (${placeholders}) AND user_id = ? AND status = 'ACTIVE'`,
+        [...targetTicketIds, from_user_id]
       );
- 
-      await connection.execute(
-        `INSERT INTO transfers (from_user_id, to_user_id, ticket_id) VALUES (?, ?, ?)`,
-        [from_user_id, to_user_id, ticket_id]
+
+      if (tickets.length !== targetTicketIds.length) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Un ou plusieurs tickets sont introuvables ou ne peuvent plus être transférés'
+        });
+      }
+
+      // Mettre à jour les tickets vers le destinataire en statut ACTIVE
+      await connection.query(
+        `UPDATE tickets SET user_id = ?, status = 'ACTIVE' WHERE id IN (${placeholders})`,
+        [to_user_id, ...targetTicketIds]
       );
- 
-      await connection.execute(
-        `INSERT INTO transactions (user_id, type, amount, description, reference_id)
-         VALUES (?, 'TRANSFERT', 0, ?, ?)`,
-        [from_user_id, `Transfert du ticket #${ticket_id} vers utilisateur ${to_user_id}`, ticket_id]
-      );
- 
+
+      for (const t of tickets) {
+        await connection.execute(
+          `INSERT INTO transfers (from_user_id, to_user_id, ticket_id) VALUES (?, ?, ?)`,
+          [from_user_id, to_user_id, t.id]
+        );
+
+        await connection.execute(
+          `INSERT INTO transactions (user_id, type, amount, description, reference_id)
+           VALUES (?, 'TRANSFERT', 0, ?, ?)`,
+          [from_user_id, `Transfert du ticket #${t.id} (${t.type}) vers utilisateur ${to_user_id}`, t.id]
+        );
+      }
+
       await connection.commit();
- 
+
       broadcast({
-        type: 'TICKET_TRANSFERRED',
-        ticket_id,
+        type: 'TICKETS_TRANSFERRED',
+        ticket_ids: targetTicketIds,
         from_user_id,
-        to_user_id
+        to_user_id,
+        count: targetTicketIds.length
       });
- 
+
+      const count = targetTicketIds.length;
       res.json({
         success: true,
-        message: 'Ticket transféré avec succès'
+        message: count === 1 ? 'Ticket transféré avec succès' : `${count} tickets transférés avec succès`
       });
     } catch (err) {
       await connection.rollback();
@@ -645,10 +661,10 @@ app.post('/api/mobile/tickets/transfer', authMiddleware, async (req, res) => {
     }
   } catch (err) {
     console.error('Erreur transfer:', err);
-    res.status(500).json({ success: false, message: 'Erreur serveur' });
+    res.status(500).json({ success: false, message: 'Erreur serveur lors du transfert' });
   }
-});
- 
+});
+
 // ==================== REMBOURSEMENT ====================
  
 app.post('/api/mobile/tickets/refund', authMiddleware, async (req, res) => {

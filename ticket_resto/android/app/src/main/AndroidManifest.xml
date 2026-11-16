@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- ✅ AJOUT : permission Internet pour PayDunya -->
+    <!-- ✅ Permissions pour PayDunya et Scan QR Code -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:label="ticket_resto"
