@@ -154,7 +154,7 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Scanner un ticket'),
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -227,7 +227,7 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                     child: ElevatedButton(
                       onPressed: _isProcessing ? null : _handleManualValidation,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
+                        backgroundColor: Colors.deepOrange,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -315,7 +315,7 @@ class _ScanTicketScreenState extends State<ScanTicketScreen> {
                 label: const Text('Saisie manuelle du code'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: Colors.teal,
+                  foregroundColor: Colors.deepOrange,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

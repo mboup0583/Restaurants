@@ -107,7 +107,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.lock_reset, color: Colors.indigo),
+                leading: const Icon(Icons.lock_reset, color: Colors.deepOrange),
                 title: const Text('Modifier le mot de passe'),
                 onTap: () {
                   Navigator.pop(ctx);

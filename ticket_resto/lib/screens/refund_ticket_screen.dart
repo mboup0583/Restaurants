@@ -95,7 +95,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         title: const Text('Demander un remboursement'),
-        backgroundColor: Colors.indigo,
+        backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
       ),
       body: _isLoading
@@ -127,7 +127,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                         ..._activeTickets.map((ticket) {
                           final selected = _selectedTicketId == ticket['id'];
                           final isPdj = ticket['type'] == 'Petit-déjeuner';
-                          final color = isPdj ? Colors.orange : Colors.indigo;
+                          final color = isPdj ? Colors.orange : Colors.deepOrange;
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
                             decoration: BoxDecoration(
@@ -161,7 +161,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: selected ? Colors.indigo : Colors.transparent, width: 2),
+                            border: Border.all(color: selected ? Colors.deepOrange : Colors.transparent, width: 2),
                             boxShadow: [
                               BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
                             ],
@@ -170,7 +170,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                             title: Text(method, style: TextStyle(fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
                             value: method,
                             groupValue: _selectedPayment,
-                            activeColor: Colors.indigo,
+                            activeColor: Colors.deepOrange,
                             onChanged: (v) => setState(() => _selectedPayment = v!),
                           ),
                         );
@@ -183,7 +183,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                         child: ElevatedButton(
                           onPressed: (_isRefunding || _activeTickets.isEmpty) ? null : _handleRefund,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo,
+                            backgroundColor: Colors.deepOrange,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
@@ -208,7 +208,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundColor: Colors.indigo,
+          backgroundColor: Colors.deepOrange,
           child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
         ),
         const SizedBox(width: 10),

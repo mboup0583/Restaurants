@@ -182,14 +182,14 @@ class _ManageTicketsScreenState extends State<ManageTicketsScreen> {
                                     leading: CircleAvatar(
                                       backgroundColor: type == 'Petit-déjeuner'
                                           ? Colors.orange.shade100
-                                          : Colors.indigo.shade100,
+                                          : Colors.deepOrange.shade100,
                                       child: Icon(
                                         type == 'Petit-déjeuner'
                                             ? Icons.free_breakfast
                                             : Icons.restaurant,
                                         color: type == 'Petit-déjeuner'
                                             ? Colors.orange
-                                            : Colors.indigo,
+                                            : Colors.deepOrange,
                                       ),
                                     ),
                                     title: Text(

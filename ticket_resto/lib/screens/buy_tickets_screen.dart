@@ -269,7 +269,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Acheter des tickets'),
-        backgroundColor: Colors.indigo,
+        backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
       ),
       body: _isLoadingPrices
@@ -328,7 +328,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                                 : null,
                             icon: const Icon(Icons.remove_circle_outline),
                             iconSize: 36,
-                            color: Colors.indigo,
+                            color: Colors.deepOrange,
                           ),
                           Container(
                             width: 60,
@@ -347,7 +347,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                                 : null,
                             icon: const Icon(Icons.add_circle_outline),
                             iconSize: 36,
-                            color: Colors.indigo,
+                            color: Colors.deepOrange,
                           ),
                         ],
                       ),
@@ -363,7 +363,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                           title: Text(method),
                           value: method,
                           groupValue: _selectedPayment,
-                          activeColor: Colors.indigo,
+                          activeColor: Colors.deepOrange,
                           onChanged: (value) {
                             setState(() => _selectedPayment = value!);
                           },
@@ -384,7 +384,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.indigo.shade50,
+                          color: Colors.orange.shade50,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -400,7 +400,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.indigo,
+                                color: Colors.deepOrange,
                               ),
                             ),
                           ],
@@ -418,7 +418,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _handleBuy,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.indigo,
+                            backgroundColor: Colors.deepOrange,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -444,7 +444,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                         const Text(
                           'En attente de confirmation Wave…\nAprès paiement, reviens simplement dans Ticket Resto.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.indigo),
+                          style: TextStyle(color: Colors.deepOrange),
                         ),
                       ],
                       const SizedBox(height: 40),
@@ -487,10 +487,10 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.indigo.shade50 : Colors.grey.shade100,
+          color: isSelected ? Colors.orange.shade50 : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Colors.indigo : Colors.transparent,
+            color: isSelected ? Colors.deepOrange : Colors.transparent,
             width: 2,
           ),
         ),
@@ -499,21 +499,21 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
             Icon(
               icon,
               size: 36,
-              color: isSelected ? Colors.indigo : Colors.grey,
+              color: isSelected ? Colors.deepOrange : Colors.grey,
             ),
             const SizedBox(height: 8),
             Text(
               title,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.indigo : Colors.black87,
+                color: isSelected ? Colors.deepOrange : Colors.black87,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               price,
               style: TextStyle(
-                color: isSelected ? Colors.indigo : Colors.grey,
+                color: isSelected ? Colors.deepOrange : Colors.grey,
                 fontSize: 13,
               ),
             ),

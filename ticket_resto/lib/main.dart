@@ -26,9 +26,12 @@ class TicketRestoApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
           useMaterial3: true,
+          scaffoldBackgroundColor: const Color(0xFFF5F6FA),
           appBarTheme: const AppBarTheme(
             centerTitle: true,
             elevation: 0,
+            backgroundColor: Colors.deepOrange,
+            foregroundColor: Colors.white,
           ),
           // ✅ Correction : CardThemeData au lieu de CardTheme
           cardTheme: CardThemeData(

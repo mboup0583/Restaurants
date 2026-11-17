@@ -93,7 +93,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mes tickets'),
-        backgroundColor: Colors.indigo,
+        backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -148,14 +148,14 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                               leading: CircleAvatar(
                                 backgroundColor: type == 'Petit-déjeuner'
                                     ? Colors.orange.shade100
-                                    : Colors.indigo.shade100,
+                                    : Colors.deepOrange.shade100,
                                 child: Icon(
                                   type == 'Petit-déjeuner'
                                       ? Icons.free_breakfast
                                       : Icons.restaurant,
                                   color: type == 'Petit-déjeuner'
                                       ? Colors.orange
-                                      : Colors.indigo,
+                                      : Colors.deepOrange,
                                 ),
                               ),
                               title: Text(

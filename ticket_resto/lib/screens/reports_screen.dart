@@ -92,13 +92,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         Icons.confirmation_number,
                         'Total tickets',
                         '${_stats?['revenue']?['total_tickets'] ?? 0}',
-                        Colors.indigo,
+                        Colors.deepOrange,
                       ),
                       _statCard(
                         Icons.calendar_today,
                         'Tickets (7 derniers jours)',
                         '${_stats?['tickets_last_7_days'] ?? 0}',
-                        Colors.teal,
+                        Colors.orange,
                       ),
 
                       const SizedBox(height: 20),

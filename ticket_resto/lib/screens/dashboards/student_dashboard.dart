@@ -19,7 +19,7 @@ class StudentDashboard extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         title: const Text('Tableau de bord Étudiant'),
-        backgroundColor: Colors.indigo,
+        backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -59,28 +59,28 @@ class StudentDashboard extends StatelessWidget {
               Icons.shopping_cart,
               'Acheter des tickets',
               const BuyTicketsScreen(),
-              color: Colors.indigo,
+              color: Colors.deepOrange,
             ),
             _buildMenuCard(
               context,
               Icons.confirmation_number,
               'Mes tickets',
               const MyTicketsScreen(),
-              color: Colors.indigo,
+              color: Colors.deepOrange,
             ),
             _buildMenuCard(
               context,
               Icons.swap_horiz,
-              'Transférer un ticket',
+              'Transférer des tickets',
               const TransferTicketScreen(),
-              color: Colors.indigo,
+              color: Colors.deepOrange,
             ),
             _buildMenuCard(
               context,
               Icons.money_off,
               'Demander un remboursement',
               const RefundTicketScreen(),
-              color: Colors.indigo,
+              color: Colors.deepOrange,
             ),
           ],
         ),
