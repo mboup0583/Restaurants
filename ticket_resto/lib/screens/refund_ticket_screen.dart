@@ -15,7 +15,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
   bool _isLoading = true;
   bool _isRefunding = false;
   String? _error;
-  int? _selectedTicketId;
+  final Set<int> _selectedTicketIds = {};
   String _selectedPayment = 'Wave';
   final List<String> _paymentMethods = ['Wave', 'Orange Money'];
 
@@ -48,10 +48,46 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
     });
   }
 
+  void _toggleTicket(int ticketId) {
+    setState(() {
+      if (_selectedTicketIds.contains(ticketId)) {
+        _selectedTicketIds.remove(ticketId);
+      } else {
+        _selectedTicketIds.add(ticketId);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedTicketIds.length == _activeTickets.length) {
+        _selectedTicketIds.clear();
+      } else {
+        _selectedTicketIds.clear();
+        for (final t in _activeTickets) {
+          _selectedTicketIds.add(t['id'] as int);
+        }
+      }
+    });
+  }
+
+  double _calculateTotalSelected() {
+    double total = 0;
+    for (final t in _activeTickets) {
+      if (_selectedTicketIds.contains(t['id'])) {
+        total += (double.tryParse(t['price'].toString()) ?? 0);
+      }
+    }
+    return total;
+  }
+
   Future<void> _handleRefund() async {
-    if (_selectedTicketId == null) {
+    if (_selectedTicketIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sélectionnez un ticket'), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text('Sélectionnez au moins un ticket à rembourser'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -60,9 +96,9 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
 
     try {
       final userId = Provider.of<AuthProvider>(context, listen: false).currentUser!.id;
-      final result = await ApiService.refundTicket(
+      final result = await ApiService.refundTickets(
         userId: userId,
-        ticketId: _selectedTicketId!,
+        ticketIds: _selectedTicketIds.toList(),
         paymentMethod: _selectedPayment,
       );
 
@@ -70,12 +106,18 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
 
       if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text(result['message'] ?? 'Demande de remboursement enregistrée'),
+            backgroundColor: Colors.green,
+          ),
         );
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message']), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(result['message'] ?? 'Erreur lors du remboursement'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
@@ -91,6 +133,9 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final allSelected = _activeTickets.isNotEmpty && _selectedTicketIds.length == _activeTickets.length;
+    final totalSelected = _calculateTotalSelected();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
@@ -107,25 +152,67 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _stepTitle('1', 'Choisissez un ticket actif'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: _stepTitle(
+                              '1',
+                              'Sélectionnez les tickets (${_selectedTicketIds.length}/${_activeTickets.length})',
+                            ),
+                          ),
+                          if (_activeTickets.isNotEmpty)
+                            TextButton.icon(
+                              onPressed: _toggleSelectAll,
+                              icon: Icon(
+                                allSelected ? Icons.check_box : Icons.check_box_outline_blank,
+                                size: 18,
+                                color: Colors.deepOrange,
+                              ),
+                              label: Text(
+                                allSelected ? 'Tout désélectionner' : 'Tout cocher',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepOrange,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
-                      if (_activeTickets.isEmpty)
+
+                      if (_selectedTicketIds.isNotEmpty)
                         Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
+                            color: Colors.deepOrange.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
                           ),
-                          child: Text(
-                            'Aucun ticket actif à rembourser',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade600),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.money_off, size: 20, color: Colors.deepOrange),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${_selectedTicketIds.length} ticket(s) sélectionné(s) • Total: ${totalSelected.toStringAsFixed(0)} FCFA',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.deepOrange,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
-                        )
+                        ),
+
+                      if (_activeTickets.isEmpty)
+                        _emptyBox('Aucun ticket actif à rembourser')
                       else
                         ..._activeTickets.map((ticket) {
-                          final selected = _selectedTicketId == ticket['id'];
+                          final ticketId = ticket['id'] as int;
+                          final selected = _selectedTicketIds.contains(ticketId);
                           final isPdj = ticket['type'] == 'Petit-déjeuner';
                           final color = isPdj ? Colors.orange : Colors.deepOrange;
                           return Container(
@@ -139,20 +226,33 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                               ],
                             ),
                             child: ListTile(
-                              onTap: () => setState(() => _selectedTicketId = ticket['id']),
+                              onTap: () => _toggleTicket(ticketId),
                               leading: CircleAvatar(
                                 backgroundColor: color.withOpacity(0.15),
                                 child: Icon(isPdj ? Icons.free_breakfast : Icons.restaurant, color: color),
                               ),
-                              title: Text(ticket['type'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: Text('${ticket['price']} FCFA'),
-                              trailing: selected ? Icon(Icons.check_circle, color: color) : null,
+                              title: Row(
+                                children: [
+                                  Text(ticket['type'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '#${ticket['id']}',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text('${ticket['price']} FCFA • Code: ${ticket['ticket_code']}'),
+                              trailing: Icon(
+                                selected ? Icons.check_box : Icons.check_box_outline_blank,
+                                color: selected ? color : Colors.grey.shade400,
+                                size: 26,
+                              ),
                             ),
                           );
                         }),
 
                       const SizedBox(height: 28),
-                      _stepTitle('2', 'Moyen de remboursement'),
+                      _stepTitle('2', 'Moyen de réception du remboursement'),
                       const SizedBox(height: 12),
                       ..._paymentMethods.map((method) {
                         final selected = _selectedPayment == method;
@@ -167,7 +267,10 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                             ],
                           ),
                           child: RadioListTile<String>(
-                            title: Text(method, style: TextStyle(fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
+                            title: Text(
+                              method,
+                              style: TextStyle(fontWeight: selected ? FontWeight.w600 : FontWeight.normal),
+                            ),
                             value: method,
                             groupValue: _selectedPayment,
                             activeColor: Colors.deepOrange,
@@ -181,10 +284,11 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: (_isRefunding || _activeTickets.isEmpty) ? null : _handleRefund,
+                          onPressed: (_isRefunding || _selectedTicketIds.isEmpty) ? null : _handleRefund,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.deepOrange,
                             foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey.shade300,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
                           child: _isRefunding
@@ -193,7 +297,14 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                                   height: 24,
                                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                                 )
-                              : const Text('Demander le remboursement', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                              : Text(
+                                  _selectedTicketIds.isEmpty
+                                      ? 'Sélectionnez un ou plusieurs tickets'
+                                      : _selectedTicketIds.length == 1
+                                          ? 'Demander le remboursement (${totalSelected.toStringAsFixed(0)} FCFA)'
+                                          : 'Rembourser les ${_selectedTicketIds.length} tickets (${totalSelected.toStringAsFixed(0)} FCFA)',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                ),
                         ),
                       ),
                       const SizedBox(height: 30),
@@ -212,8 +323,22 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
           child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
         ),
         const SizedBox(width: 10),
-        Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Expanded(
+          child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        ),
       ],
+    );
+  }
+
+  Widget _emptyBox(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(text, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600)),
     );
   }
 }

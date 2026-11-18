@@ -328,10 +328,10 @@ class ApiService {
     }
   }
 
-  // ==================== DEMANDER UN REMBOURSEMENT ====================
-  static Future<Map<String, dynamic>> refundTicket({
+  // ==================== DEMANDER UN REMBOURSEMENT (1 OU PLUSIEURS) ====================
+  static Future<Map<String, dynamic>> refundTickets({
     required int userId,
-    required int ticketId,
+    required List<int> ticketIds,
     required String paymentMethod,
     String? token,
   }) async {
@@ -342,7 +342,7 @@ class ApiService {
         headers: headers,
         body: jsonEncode({
           'user_id': userId,
-          'ticket_id': ticketId,
+          'ticket_ids': ticketIds,
           'payment_method': paymentMethod,
         }),
       );
@@ -353,7 +353,8 @@ class ApiService {
         return {
           'success': true,
           'message': data['message'] ?? 'Demande de remboursement enregistrée',
-          'refund_id': data['refund_id'],
+          'refund_ids': data['refund_ids'],
+          'total_amount': data['total_amount'],
         };
       } else {
         return {
@@ -367,6 +368,20 @@ class ApiService {
         'message': 'Impossible de contacter le serveur.',
       };
     }
+  }
+
+  static Future<Map<String, dynamic>> refundTicket({
+    required int userId,
+    required int ticketId,
+    required String paymentMethod,
+    String? token,
+  }) async {
+    return refundTickets(
+      userId: userId,
+      ticketIds: [ticketId],
+      paymentMethod: paymentMethod,
+      token: token,
+    );
   }
 
   // ==================== VALIDER UN TICKET (SCAN) ====================

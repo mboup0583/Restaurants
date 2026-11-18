@@ -669,58 +669,81 @@ app.post('/api/mobile/tickets/transfer', authMiddleware, async (req, res) => {
  
 app.post('/api/mobile/tickets/refund', authMiddleware, async (req, res) => {
   try {
-    const { user_id, ticket_id, payment_method } = req.body;
- 
-    if (!user_id || !ticket_id || !payment_method) {
-      return res.status(400).json({ success: false, message: 'Données manquantes' });
+    const { user_id, payment_method, ticket_id, ticket_ids } = req.body;
+
+    let targetTicketIds = [];
+    if (Array.isArray(ticket_ids) && ticket_ids.length > 0) {
+      targetTicketIds = ticket_ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+    } else if (ticket_id) {
+      targetTicketIds = [parseInt(ticket_id, 10)];
     }
- 
+
+    if (!user_id || !payment_method || targetTicketIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Données manquantes ou aucun ticket sélectionné' });
+    }
+
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
- 
-      const [tickets] = await connection.execute(
-        'SELECT * FROM tickets WHERE id = ? AND user_id = ? AND status = "ACTIVE"',
-        [ticket_id, user_id]
+
+      const placeholders = targetTicketIds.map(() => '?').join(',');
+      const [tickets] = await connection.query(
+        `SELECT id, ticket_code, type, price FROM tickets WHERE id IN (${placeholders}) AND user_id = ? AND status = 'ACTIVE'`,
+        [...targetTicketIds, user_id]
       );
- 
-      if (tickets.length === 0) {
+
+      if (tickets.length !== targetTicketIds.length) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Ticket introuvable ou non remboursable' });
+        return res.status(400).json({
+          success: false,
+          message: 'Un ou plusieurs tickets sont introuvables ou ne peuvent plus être remboursés'
+        });
       }
- 
-      const ticket = tickets[0];
- 
-      await connection.execute(
-        `UPDATE tickets SET status = 'REFUNDED' WHERE id = ?`,
-        [ticket_id]
+
+      await connection.query(
+        `UPDATE tickets SET status = 'REFUNDED' WHERE id IN (${placeholders})`,
+        targetTicketIds
       );
- 
-      const [result] = await connection.execute(
-        `INSERT INTO refunds (user_id, ticket_id, amount, payment_method, status)
-         VALUES (?, ?, ?, ?, 'PENDING')`,
-        [user_id, ticket_id, ticket.price, payment_method]
-      );
- 
-      await connection.execute(
-        `INSERT INTO transactions (user_id, type, amount, description, reference_id)
-         VALUES (?, 'REMBOURSEMENT', ?, ?, ?)`,
-        [user_id, ticket.price, `Demande de remboursement ticket #${ticket_id}`, result.insertId]
-      );
- 
+
+      let totalAmount = 0;
+      const refundIds = [];
+
+      for (const t of tickets) {
+        const tPrice = parseFloat(t.price);
+        totalAmount += tPrice;
+
+        const [result] = await connection.execute(
+          `INSERT INTO refunds (user_id, ticket_id, amount, payment_method, status)
+           VALUES (?, ?, ?, ?, 'PENDING')`,
+          [user_id, t.id, tPrice, payment_method]
+        );
+        refundIds.push(result.insertId);
+
+        await connection.execute(
+          `INSERT INTO transactions (user_id, type, amount, description, reference_id)
+           VALUES (?, 'REMBOURSEMENT', ?, ?, ?)`,
+          [user_id, tPrice, `Demande de remboursement ticket #${t.id} (${t.type})`, result.insertId]
+        );
+      }
+
       await connection.commit();
- 
+
       broadcast({
         type: 'REFUND_REQUESTED',
         user_id,
-        ticket_id,
-        amount: ticket.price
+        ticket_ids: targetTicketIds,
+        amount: totalAmount,
+        count: targetTicketIds.length
       });
- 
+
+      const count = targetTicketIds.length;
       res.json({
         success: true,
-        message: 'Demande de remboursement enregistrée',
-        refund_id: result.insertId
+        message: count === 1
+          ? 'Demande de remboursement enregistrée'
+          : `${count} demandes de remboursement enregistrées (${totalAmount} FCFA)`,
+        refund_ids: refundIds,
+        total_amount: totalAmount
       });
     } catch (err) {
       await connection.rollback();
@@ -730,10 +753,10 @@ app.post('/api/mobile/tickets/refund', authMiddleware, async (req, res) => {
     }
   } catch (err) {
     console.error('Erreur refund:', err);
-    res.status(500).json({ success: false, message: 'Erreur serveur' });
+    res.status(500).json({ success: false, message: 'Erreur serveur lors du remboursement' });
   }
-});
- 
+});
+
 // ==================== TOUS LES TICKETS (ADMIN) ====================
 app.get('/api/mobile/tickets', authMiddleware, adminMiddleware, async (req, res) => {
   try {
