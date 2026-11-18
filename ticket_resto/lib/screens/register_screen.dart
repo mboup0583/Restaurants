@@ -127,7 +127,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Text(
                       'Code (test) : $debugCode',
                       style: const TextStyle(
-                        color: Colors.orange,
+                        color: const Color(0xFF2E7D32),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -168,7 +168,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Le code doit contenir 5 chiffres'),
-                                backgroundColor: Colors.orange,
+                                backgroundColor: const Color(0xFF2E7D32),
                               ),
                             );
                             return;
@@ -218,7 +218,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepOrange,
+                    backgroundColor: const Color(0xFF1B5E20),
                     foregroundColor: Colors.white,
                   ),
                   child: verifying
@@ -245,7 +245,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Inscription'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
       ),
       body: SafeArea(
@@ -411,7 +411,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleRegister,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
+                      backgroundColor: const Color(0xFF1B5E20),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

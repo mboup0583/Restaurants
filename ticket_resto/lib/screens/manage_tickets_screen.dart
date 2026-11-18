@@ -88,7 +88,7 @@ class _ManageTicketsScreenState extends State<ManageTicketsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gérer les tickets'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -115,7 +115,7 @@ class _ManageTicketsScreenState extends State<ManageTicketsScreen> {
                   child: ChoiceChip(
                     label: Text(label),
                     selected: isSelected,
-                    selectedColor: Colors.deepOrange.shade100,
+                    selectedColor: Colors.green.shade100,
                     onSelected: (_) {
                       setState(() => _filter = f);
                     },
@@ -181,15 +181,15 @@ class _ManageTicketsScreenState extends State<ManageTicketsScreen> {
                                     ),
                                     leading: CircleAvatar(
                                       backgroundColor: type == 'Petit-déjeuner'
-                                          ? Colors.orange.shade100
-                                          : Colors.deepOrange.shade100,
+                                          ? Colors.green.shade50
+                                          : Colors.green.shade100,
                                       child: Icon(
                                         type == 'Petit-déjeuner'
                                             ? Icons.free_breakfast
                                             : Icons.restaurant,
                                         color: type == 'Petit-déjeuner'
-                                            ? Colors.orange
-                                            : Colors.deepOrange,
+                                            ? const Color(0xFF2E7D32)
+                                            : const Color(0xFF1B5E20),
                                       ),
                                     ),
                                     title: Text(

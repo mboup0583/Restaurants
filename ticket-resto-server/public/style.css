@@ -13,7 +13,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #e65100, #ff8a50);
+  background: linear-gradient(135deg, #1B5E20, #2E7D32);
 }
 .login-card {
   background: #fff;
@@ -23,7 +23,7 @@ body {
   max-width: 380px;
   box-shadow: 0 10px 40px rgba(0,0,0,.15);
 }
-.login-card h1 { color: #e65100; margin-bottom: .25rem; }
+.login-card h1 { color: #1B5E20; margin-bottom: .25rem; }
 .subtitle { color: #888; margin-bottom: 1.5rem; }
 .login-card label { display: block; font-size: .85rem; margin-bottom: .35rem; color: #555; }
 .login-card input {
@@ -37,14 +37,14 @@ body {
 .login-card button {
   width: 100%;
   padding: .8rem;
-  background: #e65100;
+  background: #1B5E20;
   color: #fff;
   border: none;
   border-radius: 8px;
   font-size: 1rem;
   cursor: pointer;
 }
-.login-card button:hover { background: #bf360c; }
+.login-card button:hover { background: #0D3810; }
 .error { color: #c62828; margin-top: .75rem; font-size: .9rem; min-height: 1.2em; }
 
 /* LAYOUT */
@@ -62,7 +62,7 @@ body {
   font-weight: 700;
   font-size: 1.2rem;
   margin-bottom: 2rem;
-  color: #ff8a50;
+  color: #2E7D32;
 }
 .nav-btn {
   display: block;
@@ -78,7 +78,7 @@ body {
   font-size: .95rem;
 }
 .nav-btn:hover, .nav-btn.active {
-  background: #e65100;
+  background: #1B5E20;
   color: #fff;
 }
 .logout {
@@ -90,7 +90,7 @@ body {
   border-radius: 8px;
   cursor: pointer;
 }
-.logout:hover { border-color: #e65100; color: #ff8a50; }
+.logout:hover { border-color: #1B5E20; color: #2E7D32; }
 
 .content { flex: 1; padding: 1.5rem 2rem; }
 .topbar {
@@ -116,7 +116,7 @@ body {
 .card .label { color: #888; font-size: .85rem; }
 .card .value { font-size: 1.5rem; font-weight: 700; margin-top: .35rem; }
 .card.green .value { color: #2e7d32; }
-.card.orange .value { color: #e65100; }
+.card.orange .value { color: #1B5E20; }
 .card.blue .value { color: #1565c0; }
 .card.teal .value { color: #00897b; }
 
@@ -133,7 +133,7 @@ body {
   background: #fff;
   cursor: pointer;
 }
-.toolbar button { background: #e65100; color: #fff; border: none; }
+.toolbar button { background: #1B5E20; color: #fff; border: none; }
 .table-wrap {
   background: #fff;
   border-radius: 12px;
@@ -153,8 +153,8 @@ th { background: #fafafa; font-weight: 600; color: #555; }
 .badge-active { background: #e8f5e9; color: #2e7d32; }
 .badge-used { background: #eeeeee; color: #616161; }
 .badge-transferred { background: #e3f2fd; color: #1565c0; }
-.badge-refunded { background: #fff3e0; color: #e65100; }
-.badge-admin { background: #fbe9e7; color: #e65100; }
+.badge-refunded { background: #e8f5e9; color: #1B5E20; }
+.badge-admin { background: #e8f5e9; color: #1B5E20; }
 .badge-agent { background: #e0f2f1; color: #00897b; }
 .badge-student { background: #e8eaf6; color: #3949ab; }
 
@@ -178,7 +178,7 @@ th { background: #fafafa; font-weight: 600; color: #555; }
   font-size: 1rem;
 }
 #save-prices {
-  background: #e65100;
+  background: #1B5E20;
   color: #fff;
   border: none;
   padding: .7rem 1.2rem;
@@ -202,7 +202,7 @@ th { background: #fafafa; font-weight: 600; color: #555; }
 .btn-edit { background: #e3f2fd; color: #1565c0; }
 .btn-delete { background: #ffebee; color: #c62828; }
 .btn-ok { background: #e8f5e9; color: #2e7d32; }
-.btn-no { background: #fff3e0; color: #e65100; }
+.btn-no { background: #e8f5e9; color: #1B5E20; }
 
 /* Modal */
 .modal {
@@ -244,7 +244,7 @@ th { background: #fafafa; font-weight: 600; color: #555; }
   justify-content: flex-end;
 }
 .btn-primary {
-  background: #e65100;
+  background: #1B5E20;
   color: #fff;
   border: none;
   padding: .55rem 1rem;

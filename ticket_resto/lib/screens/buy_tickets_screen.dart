@@ -128,7 +128,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Orange Money bientôt disponible. Utilisez Wave.'),
-          backgroundColor: Colors.orange,
+          backgroundColor: const Color(0xFF2E7D32),
         ),
       );
       return;
@@ -269,7 +269,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Acheter des tickets'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
       ),
       body: _isLoadingPrices
@@ -328,7 +328,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                                 : null,
                             icon: const Icon(Icons.remove_circle_outline),
                             iconSize: 36,
-                            color: Colors.deepOrange,
+                            color: const Color(0xFF1B5E20),
                           ),
                           Container(
                             width: 60,
@@ -347,7 +347,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                                 : null,
                             icon: const Icon(Icons.add_circle_outline),
                             iconSize: 36,
-                            color: Colors.deepOrange,
+                            color: const Color(0xFF1B5E20),
                           ),
                         ],
                       ),
@@ -363,7 +363,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                           title: Text(method),
                           value: method,
                           groupValue: _selectedPayment,
-                          activeColor: Colors.deepOrange,
+                          activeColor: const Color(0xFF1B5E20),
                           onChanged: (value) {
                             setState(() => _selectedPayment = value!);
                           },
@@ -384,7 +384,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
+                          color: Colors.green.shade50,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -400,7 +400,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.deepOrange,
+                                color: const Color(0xFF1B5E20),
                               ),
                             ),
                           ],
@@ -418,7 +418,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _handleBuy,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepOrange,
+                            backgroundColor: const Color(0xFF1B5E20),
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -444,7 +444,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                         const Text(
                           'En attente de confirmation Wave…\nAprès paiement, reviens simplement dans Ticket Resto.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.deepOrange),
+                          style: TextStyle(color: const Color(0xFF1B5E20)),
                         ),
                       ],
                       const SizedBox(height: 40),
@@ -487,10 +487,10 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.orange.shade50 : Colors.grey.shade100,
+          color: isSelected ? Colors.green.shade50 : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Colors.deepOrange : Colors.transparent,
+            color: isSelected ? const Color(0xFF1B5E20) : Colors.transparent,
             width: 2,
           ),
         ),
@@ -499,21 +499,21 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
             Icon(
               icon,
               size: 36,
-              color: isSelected ? Colors.deepOrange : Colors.grey,
+              color: isSelected ? const Color(0xFF1B5E20) : Colors.grey,
             ),
             const SizedBox(height: 8),
             Text(
               title,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.deepOrange : Colors.black87,
+                color: isSelected ? const Color(0xFF1B5E20) : Colors.black87,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               price,
               style: TextStyle(
-                color: isSelected ? Colors.deepOrange : Colors.grey,
+                color: isSelected ? const Color(0xFF1B5E20) : Colors.grey,
                 fontSize: 13,
               ),
             ),

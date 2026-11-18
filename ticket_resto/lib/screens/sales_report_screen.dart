@@ -44,7 +44,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rapport des ventes'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -79,7 +79,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         Icons.today,
                         'Tickets validés',
                         '${_report?['today']?['count'] ?? 0}',
-                        Colors.deepOrange,
+                        const Color(0xFF1B5E20),
                       ),
                       _statCard(
                         Icons.attach_money,
@@ -94,13 +94,13 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                         Icons.confirmation_number,
                         'Tickets utilisés',
                         '${_report?['totals']?['total_used'] ?? 0}',
-                        Colors.orange,
+                        const Color(0xFF2E7D32),
                       ),
                       _statCard(
                         Icons.payments,
                         'Montant total',
                         '${_report?['totals']?['total_amount'] ?? 0} FCFA',
-                        Colors.deepOrange,
+                        const Color(0xFF1B5E20),
                       ),
 
                       const SizedBox(height: 16),

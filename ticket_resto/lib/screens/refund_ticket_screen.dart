@@ -86,7 +86,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Sélectionnez au moins un ticket à rembourser'),
-          backgroundColor: Colors.orange,
+          backgroundColor: const Color(0xFF2E7D32),
         ),
       );
       return;
@@ -137,10 +137,10 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
     final totalSelected = _calculateTotalSelected();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: const Color(0xFFF7F9F7),
       appBar: AppBar(
         title: const Text('Demander un remboursement'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
       ),
       body: _isLoading
@@ -167,13 +167,13 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                               icon: Icon(
                                 allSelected ? Icons.check_box : Icons.check_box_outline_blank,
                                 size: 18,
-                                color: Colors.deepOrange,
+                                color: const Color(0xFF1B5E20),
                               ),
                               label: Text(
                                 allSelected ? 'Tout désélectionner' : 'Tout cocher',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.deepOrange,
+                                  color: const Color(0xFF1B5E20),
                                   fontSize: 12,
                                 ),
                               ),
@@ -187,19 +187,19 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.deepOrange.withOpacity(0.08),
+                            color: const Color(0xFF1B5E20).withOpacity(0.08),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFF1B5E20).withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.money_off, size: 20, color: Colors.deepOrange),
+                              const Icon(Icons.money_off, size: 20, color: const Color(0xFF1B5E20)),
                               const SizedBox(width: 10),
                               Text(
                                 '${_selectedTicketIds.length} ticket(s) sélectionné(s) • Total: ${totalSelected.toStringAsFixed(0)} FCFA',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.deepOrange,
+                                  color: const Color(0xFF1B5E20),
                                   fontSize: 13,
                                 ),
                               ),
@@ -214,7 +214,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                           final ticketId = ticket['id'] as int;
                           final selected = _selectedTicketIds.contains(ticketId);
                           final isPdj = ticket['type'] == 'Petit-déjeuner';
-                          final color = isPdj ? Colors.orange : Colors.deepOrange;
+                          final color = isPdj ? const Color(0xFF2E7D32) : const Color(0xFF1B5E20);
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
                             decoration: BoxDecoration(
@@ -261,7 +261,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: selected ? Colors.deepOrange : Colors.transparent, width: 2),
+                            border: Border.all(color: selected ? const Color(0xFF1B5E20) : Colors.transparent, width: 2),
                             boxShadow: [
                               BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
                             ],
@@ -273,7 +273,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                             ),
                             value: method,
                             groupValue: _selectedPayment,
-                            activeColor: Colors.deepOrange,
+                            activeColor: const Color(0xFF1B5E20),
                             onChanged: (v) => setState(() => _selectedPayment = v!),
                           ),
                         );
@@ -286,7 +286,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
                         child: ElevatedButton(
                           onPressed: (_isRefunding || _selectedTicketIds.isEmpty) ? null : _handleRefund,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepOrange,
+                            backgroundColor: const Color(0xFF1B5E20),
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: Colors.grey.shade300,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -319,7 +319,7 @@ class _RefundTicketScreenState extends State<RefundTicketScreen> {
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundColor: Colors.deepOrange,
+          backgroundColor: const Color(0xFF1B5E20),
           child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
         ),
         const SizedBox(width: 10),

@@ -15,10 +15,10 @@ class AdminDashboard extends StatelessWidget {
     final user = authProvider.currentUser;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: const Color(0xFFF7F9F7),
       appBar: AppBar(
         title: const Text('Tableau de bord Admin'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -58,28 +58,28 @@ class AdminDashboard extends StatelessWidget {
               Icons.people,
               'Gérer les utilisateurs',
               const ManageUsersScreen(),
-              color: Colors.deepOrange,
+              color: const Color(0xFF1B5E20),
             ),
             _buildMenuCard(
               context,
               Icons.confirmation_number,
               'Gérer les tickets',
               const ManageTicketsScreen(),
-              color: Colors.deepOrange,
+              color: const Color(0xFF1B5E20),
             ),
             _buildMenuCard(
               context,
               Icons.bar_chart,
               'Rapports',
               const ReportsScreen(),
-              color: Colors.deepOrange,
+              color: const Color(0xFF1B5E20),
             ),
             _buildMenuCard(
               context,
               Icons.sync,
               'Synchronisation',
               null,
-              color: Colors.deepOrange,
+              color: const Color(0xFF1B5E20),
             ),
           ],
         ),
@@ -92,7 +92,7 @@ class AdminDashboard extends StatelessWidget {
     IconData icon,
     String title,
     Widget? screen, {
-    Color color = Colors.deepOrange,
+    Color color = const Color(0xFF1B5E20),
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

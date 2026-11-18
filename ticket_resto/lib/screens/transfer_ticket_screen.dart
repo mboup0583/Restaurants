@@ -91,7 +91,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Sélectionnez au moins un ticket à transférer'),
-          backgroundColor: Colors.orange,
+          backgroundColor: const Color(0xFF2E7D32),
         ),
       );
       return;
@@ -102,7 +102,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez saisir un email valide pour le destinataire'),
-          backgroundColor: Colors.orange,
+          backgroundColor: const Color(0xFF2E7D32),
         ),
       );
       return;
@@ -141,7 +141,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Impossible de se transférer des tickets à soi-même'),
-            backgroundColor: Colors.orange,
+            backgroundColor: const Color(0xFF2E7D32),
           ),
         );
         return;
@@ -188,10 +188,10 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
     final totalSelected = _calculateTotalSelected();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: const Color(0xFFF7F9F7),
       appBar: AppBar(
         title: const Text('Transférer des tickets'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
       ),
       body: _isLoading
@@ -218,13 +218,13 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
                               icon: Icon(
                                 allSelected ? Icons.check_box : Icons.check_box_outline_blank,
                                 size: 18,
-                                color: Colors.deepOrange,
+                                color: const Color(0xFF1B5E20),
                               ),
                               label: Text(
                                 allSelected ? 'Tout désélectionner' : 'Tout cocher',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.deepOrange,
+                                  color: const Color(0xFF1B5E20),
                                   fontSize: 12,
                                 ),
                               ),
@@ -238,19 +238,19 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.deepOrange.withOpacity(0.08),
+                            color: const Color(0xFF1B5E20).withOpacity(0.08),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFF1B5E20).withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.confirmation_number_outlined, size: 20, color: Colors.deepOrange),
+                              const Icon(Icons.confirmation_number_outlined, size: 20, color: const Color(0xFF1B5E20)),
                               const SizedBox(width: 10),
                               Text(
                                 '${_selectedTicketIds.length} ticket(s) sélectionné(s) • Total: ${totalSelected.toStringAsFixed(0)} FCFA',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.deepOrange,
+                                  color: const Color(0xFF1B5E20),
                                   fontSize: 13,
                                 ),
                               ),
@@ -312,7 +312,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
                         child: ElevatedButton(
                           onPressed: (_isTransferring || _selectedTicketIds.isEmpty) ? null : _handleTransfer,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepOrange,
+                            backgroundColor: const Color(0xFF1B5E20),
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: Colors.grey.shade300,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -345,7 +345,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundColor: Colors.deepOrange,
+          backgroundColor: const Color(0xFF1B5E20),
           child: Text(num, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
         ),
         const SizedBox(width: 10),
@@ -374,7 +374,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
     required bool isPdj,
     required VoidCallback onTap,
   }) {
-    final color = isPdj ? Colors.orange : Colors.deepOrange;
+    final color = isPdj ? const Color(0xFF2E7D32) : const Color(0xFF1B5E20);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(

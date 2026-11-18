@@ -44,7 +44,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rapports'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -86,19 +86,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         Icons.money_off,
                         'Remboursements',
                         '${_stats?['revenue']?['total_refunded'] ?? 0} FCFA',
-                        Colors.orange,
+                        const Color(0xFF388E3C),
                       ),
                       _statCard(
                         Icons.confirmation_number,
                         'Total tickets',
                         '${_stats?['revenue']?['total_tickets'] ?? 0}',
-                        Colors.deepOrange,
+                        const Color(0xFF1B5E20),
                       ),
                       _statCard(
                         Icons.calendar_today,
                         'Tickets (7 derniers jours)',
                         '${_stats?['tickets_last_7_days'] ?? 0}',
-                        Colors.orange,
+                        const Color(0xFF2E7D32),
                       ),
 
                       const SizedBox(height: 20),

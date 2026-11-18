@@ -55,7 +55,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   Color _getTypeColor(String type) {
     switch (type) {
       case 'Administrateur':
-        return Colors.deepOrange;
+        return const Color(0xFF1B5E20);
       case 'Agent universitaire':
         return Colors.teal;
       case 'Étudiant':
@@ -107,7 +107,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.lock_reset, color: Colors.deepOrange),
+                leading: const Icon(Icons.lock_reset, color: const Color(0xFF1B5E20)),
                 title: const Text('Modifier le mot de passe'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -163,7 +163,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepOrange,
+                backgroundColor: const Color(0xFF1B5E20),
                 foregroundColor: Colors.white,
               ),
               onPressed: () {
@@ -253,7 +253,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gérer les utilisateurs'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -278,7 +278,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                   child: ChoiceChip(
                     label: Text(f),
                     selected: isSelected,
-                    selectedColor: Colors.deepOrange.shade100,
+                    selectedColor: Colors.green.shade100,
                     onSelected: (_) {
                       setState(() => _filter = f);
                     },

@@ -18,7 +18,7 @@ class TicketQrScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('QR Code du ticket'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
       ),
       body: Center(

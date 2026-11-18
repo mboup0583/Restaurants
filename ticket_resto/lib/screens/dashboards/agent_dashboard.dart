@@ -14,10 +14,10 @@ class AgentDashboard extends StatelessWidget {
     final user = authProvider.currentUser;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: const Color(0xFFF7F9F7),
       appBar: AppBar(
         title: const Text('Tableau de bord Agent'),
-        backgroundColor: Colors.deepOrange,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -57,14 +57,14 @@ class AgentDashboard extends StatelessWidget {
               Icons.qr_code_scanner,
               'Scanner un ticket',
               const ScanTicketScreen(),
-              color: Colors.deepOrange,
+              color: const Color(0xFF1B5E20),
             ),
             _buildMenuCard(
               context,
               Icons.bar_chart,
               'Rapport des ventes',
               const SalesReportScreen(),
-              color: Colors.deepOrange,
+              color: const Color(0xFF1B5E20),
             ),
           ],
         ),
@@ -77,7 +77,7 @@ class AgentDashboard extends StatelessWidget {
     IconData icon,
     String title,
     Widget? screen, {
-    Color color = Colors.deepOrange,
+    Color color = const Color(0xFF1B5E20),
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

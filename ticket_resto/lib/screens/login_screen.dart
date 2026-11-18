@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FD),
+      backgroundColor: const Color(0xFFF7F9F7),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
@@ -106,10 +106,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           height: 52,
                           width: 52,
                           decoration: BoxDecoration(
-                            color: Colors.deepOrange.shade50,
+                            color: Colors.green.shade50,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.school, color: Colors.deepOrange, size: 28),
+                          child: const Icon(Icons.school, color: const Color(0xFF1B5E20), size: 28),
                         ),
                       ),
                     ),
@@ -134,7 +134,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.5,
-                              color: Colors.deepOrange,
+                              color: const Color(0xFF1B5E20),
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -155,28 +155,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 26),
 
-              // ==================== HERO TICKET RESTO ====================
+              // ==================== HERO TICKET RESTO (LOGO VERT ET BLANC) ====================
               Container(
-                padding: const EdgeInsets.all(18),
+                height: 86,
+                width: 86,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF6D00), Color(0xFFFF9100)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
                   shape: BoxShape.circle,
+                  color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.deepOrange.withOpacity(0.35),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
+                      color: const Color(0xFF1B5E20).withOpacity(0.25),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
                     ),
                   ],
+                  border: Border.all(color: const Color(0xFF1B5E20).withOpacity(0.2), width: 2.5),
                 ),
-                child: const Icon(
-                  Icons.restaurant_menu_rounded,
-                  size: 46,
-                  color: Colors.white,
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/logo.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.restaurant_menu_rounded,
+                        size: 44,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -243,7 +257,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         decoration: InputDecoration(
                           labelText: 'Adresse e-mail',
                           hintText: 'etudiant@zig.univ.sn',
-                          prefixIcon: const Icon(Icons.alternate_email_rounded, color: Colors.deepOrange, size: 20),
+                          prefixIcon: const Icon(Icons.alternate_email_rounded, color: const Color(0xFF1B5E20), size: 20),
                           filled: true,
                           fillColor: const Color(0xFFF8F9FA),
                           border: OutlineInputBorder(
@@ -252,7 +266,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: Colors.deepOrange, width: 2),
+                            borderSide: const BorderSide(color: Color(0xFF1B5E20), width: 2),
                           ),
                         ),
                         validator: (value) {
@@ -273,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
                           labelText: 'Mot de passe',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded, color: Colors.deepOrange, size: 20),
+                          prefixIcon: const Icon(Icons.lock_outline_rounded, color: const Color(0xFF1B5E20), size: 20),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
@@ -294,7 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(color: Colors.deepOrange, width: 2),
+                            borderSide: const BorderSide(color: Color(0xFF1B5E20), width: 2),
                           ),
                         ),
                         validator: (value) {
@@ -313,10 +327,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: ElevatedButton(
                           onPressed: authProvider.isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepOrange,
+                            backgroundColor: const Color(0xFF1B5E20),
                             foregroundColor: Colors.white,
                             elevation: 3,
-                            shadowColor: Colors.deepOrange.withOpacity(0.4),
+                            shadowColor: const Color(0xFF1B5E20).withOpacity(0.4),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -359,7 +373,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 TextSpan(
                                   text: 'S\'inscrire',
                                   style: TextStyle(
-                                    color: Colors.deepOrange,
+                                    color: const Color(0xFF1B5E20),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -404,10 +418,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         errorBuilder: (_, __, ___) => Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
+                            color: Colors.green.shade50,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.corporate_fare, color: Colors.deepOrange, size: 22),
+                          child: const Icon(Icons.corporate_fare, color: const Color(0xFF1B5E20), size: 22),
                         ),
                       ),
                     ),
