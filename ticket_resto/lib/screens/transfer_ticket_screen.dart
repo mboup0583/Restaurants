@@ -111,22 +111,12 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
     setState(() => _isTransferring = true);
 
     try {
-      final usersResult = await ApiService.getUsers();
-      if (usersResult['success'] != true) {
-        throw Exception(usersResult['message'] ?? 'Impossible de trouver l\'utilisateur');
-      }
-
-      final users = usersResult['users'] as List;
-      final recipient = users.cast<dynamic>().firstWhere(
-            (u) => u['email'] == email,
-            orElse: () => null,
-          );
-
-      if (recipient == null) {
+      final lookupResult = await ApiService.lookupUserByEmail(email);
+      if (lookupResult['success'] != true || lookupResult['user'] == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Aucun utilisateur avec cet email'),
+            SnackBar(
+              content: Text(lookupResult['message'] ?? 'Aucun utilisateur avec cet email'),
               backgroundColor: Colors.red,
             ),
           );
@@ -134,6 +124,7 @@ class _TransferTicketScreenState extends State<TransferTicketScreen> {
         return;
       }
 
+      final recipient = lookupResult['user'];
       final toUserId = recipient['id'] as int;
       final fromUserId = Provider.of<AuthProvider>(context, listen: false).currentUser!.id;
 

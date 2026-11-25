@@ -37,6 +37,48 @@ function authMiddleware(req, res, next) {
   }
 }
  
+
+// ==================== SÉCURITÉ : RATE LIMITING ====================
+const rateLimitStore = new Map();
+
+function createRateLimiter({ windowMs = 15 * 60 * 1000, maxRequests = 10, message } = {}) {
+  return (req, res, next) => {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
+    const key = `${req.baseUrl || req.path}:${ip}`;
+    const now = Date.now();
+    const record = rateLimitStore.get(key) || { count: 0, resetTime: now + windowMs };
+
+    if (now > record.resetTime) {
+      record.count = 1;
+      record.resetTime = now + windowMs;
+    } else {
+      record.count += 1;
+    }
+
+    rateLimitStore.set(key, record);
+
+    if (record.count > maxRequests) {
+      return res.status(429).json({
+        success: false,
+        message: message || 'Trop de requêtes. Veuillez patienter avant de réessayer.',
+      });
+    }
+    next();
+  };
+}
+
+const loginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 10,
+  message: 'Trop de tentatives de connexion échouées. Réessayez dans 15 minutes.',
+});
+
+const otpLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 5,
+  message: 'Trop de demandes de codes de vérification. Réessayez dans 15 minutes.',
+});
+
 function adminMiddleware(req, res, next) {
   if (!req.user || req.user.user_type !== 'Administrateur') {
     return res.status(403).json({ success: false, message: 'Accès admin requis' });
@@ -176,7 +218,7 @@ function generateTicketCode(type) {
  
 // ==================== ROUTES AUTH ====================
  
-app.post('/api/mobile/login', async (req, res) => {
+app.post('/api/mobile/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -251,7 +293,7 @@ app.post('/api/mobile/send-verification-code', async (req, res) => {
     verificationCodes.set(email, {
       full_name,
       password,
-      user_type,
+      user_type: safeUserType,
       student_id: student_id || null,
       phone: phone ? String(phone).replace(/\s/g, '') : null,
       code,
@@ -364,7 +406,7 @@ app.post('/api/mobile/verify-and-register', async (req, res) => {
 });
  
 // ==================== ROUTE REGISTER (ANCIENNE - GARDÉE POUR COMPATIBILITÉ) ====================
-app.post('/api/mobile/register', async (req, res) => {
+app.post('/api/mobile/register', otpLimiter, async (req, res) => {
   try {
     const { full_name, email, password, user_type, student_id, phone } = req.body;
  
@@ -395,7 +437,7 @@ app.post('/api/mobile/register', async (req, res) => {
         full_name,
         email,
         hashedPassword,
-        user_type,
+        safeUserType,
         student_id || null,
         phone ? String(phone).replace(/\s/g, '') : null,
       ]
@@ -440,7 +482,8 @@ app.get('/api/mobile/users', authMiddleware, async (req, res) => {
  
 // ==================== ROUTES TICKETS ====================
  
-app.post('/api/mobile/tickets/buy', authMiddleware, async (req, res) => {
+// Achat direct / allocation manuelle : réservée aux Administrateurs (les étudiants passent par Wave/PayDunya)
+app.post('/api/mobile/tickets/buy', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { user_id, type, quantity, payment_method } = req.body;
  
@@ -1511,6 +1554,219 @@ app.post('/api/payments/paydunya/webhook', async (req, res) => {
   }
 });
  
+
+// ==================== INTERFACE DE PAIEMENT WAVE SÉNÉGAL ====================
+app.get('/api/payments/wave-checkout', async (req, res) => {
+  try {
+    const { payment_id, token } = req.query;
+    if (!payment_id || !token) {
+      return res.status(400).send('<h2>Paramètres de paiement invalides</h2>');
+    }
+
+    const [rows] = await pool.execute(
+      `SELECT p.*, u.full_name, u.email, u.phone FROM payments p 
+       LEFT JOIN users u ON p.user_id = u.id 
+       WHERE p.id = ? AND p.paydunya_token = ?`,
+      [payment_id, token]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).send('<h2>Paiement introuvable ou expiré</h2>');
+    }
+
+    const payment = rows[0];
+    const isPaid = payment.status === 'PAID';
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paiement Wave - Ticket Resto UASZ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #0b1e36; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; color: #1e293b; }
+    .card { background: #ffffff; width: 100%; max-width: 420px; border-radius: 24px; padding: 28px 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center; }
+    .wave-badge { background: #1DA1F2; width: 72px; height: 72px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; box-shadow: 0 8px 16px rgba(29, 161, 242, 0.35); }
+    .wave-badge svg { width: 40px; height: 40px; fill: white; }
+    h1 { font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+    .sub { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    .order-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px; margin-bottom: 24px; text-align: left; }
+    .order-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+    .order-row:last-child { margin-bottom: 0; border-top: 1px dashed #cbd5e1; padding-top: 10px; font-weight: 800; font-size: 16px; color: #0f172a; }
+    .order-label { color: #64748b; }
+    .btn-pay { background: #1DA1F2; color: #ffffff; border: none; width: 100%; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 14px rgba(29, 161, 242, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-pay:hover { background: #0c85d0; transform: translateY(-1px); }
+    .success-box { display: none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 16px; padding: 20px; color: #065f46; margin-top: 16px; }
+    .univ-tag { font-size: 11px; color: #94a3b8; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="wave-badge">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm4 0h-2v-6h2v6zm-2-8c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg>
+    </div>
+    <h1>Paiement Wave</h1>
+    <p class="sub">Ticket Resto • Université Assane Seck</p>
+
+    <div class="order-box">
+      <div class="order-row">
+        <span class="order-label">Article :</span>
+        <span>${payment.quantity} ticket(s) ${payment.ticket_type}</span>
+      </div>
+      <div class="order-row">
+        <span class="order-label">Client :</span>
+        <span>${payment.full_name || 'Étudiant'}</span>
+      </div>
+      <div class="order-row">
+        <span class="order-label">Téléphone :</span>
+        <span>${payment.phone || 'Non renseigné'}</span>
+      </div>
+      <div class="order-row">
+        <span class="order-label">Total :</span>
+        <span>${payment.amount} FCFA</span>
+      </div>
+    </div>
+
+    ${isPaid ? `
+      <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:16px; padding:20px; color:#065f46;">
+        <h3 style="margin-bottom:6px;">✅ Paiement déjà validé</h3>
+        <p style="font-size:13px;">Vos tickets sont disponibles dans l'application Ticket Resto.</p>
+      </div>
+    ` : `
+      <button class="btn-pay" id="btn-submit" onclick="validerPaiement()">
+        <span>Payer ${payment.amount} FCFA avec Wave</span>
+      </button>
+      <div class="success-box" id="success-view">
+        <h3 style="margin-bottom:6px;">🎉 Paiement réussi !</h3>
+        <p style="font-size:13px;">Vos ${payment.quantity} ticket(s) ${payment.ticket_type} ont été générés.<br>Vous pouvez revenir dans l'application Ticket Resto.</p>
+      </div>
+    `}
+
+    <p class="univ-tag">CROUS Ziguinchor • Transaction sécurisée</p>
+  </div>
+
+  <script>
+    async function validerPaiement() {
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.innerText = 'Validation en cours...';
+
+      try {
+        const res = await fetch('/api/payments/wave-simulator/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payment_id: ${payment.id},
+            token: '${token}'
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          btn.style.display = 'none';
+          document.getElementById('success-view').style.display = 'block';
+        } else {
+          alert('Erreur: ' + (data.message || 'Impossible de valider le paiement'));
+          btn.disabled = false;
+          btn.innerText = 'Réessayer';
+        }
+      } catch (err) {
+        alert('Erreur réseau : ' + err.message);
+        btn.disabled = false;
+        btn.innerText = 'Réessayer';
+      }
+    }
+  </script>
+</body>
+</html>`;
+
+    res.send(html);
+  } catch (err) {
+    console.error('Erreur wave-checkout:', err);
+    res.status(500).send('<h2>Erreur serveur</h2>');
+  }
+});
+
+// Endpoint de confirmation directe pour la passerelle Wave
+app.post('/api/payments/wave-simulator/confirm', async (req, res) => {
+  try {
+    const { payment_id, token } = req.body;
+    if (!payment_id || !token) {
+      return res.status(400).json({ success: false, message: 'Paramètres manquants' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Sécurité Race Condition : verrouillage FOR UPDATE
+      const [rows] = await connection.execute(
+        'SELECT * FROM payments WHERE id = ? AND paydunya_token = ? FOR UPDATE',
+        [payment_id, token]
+      );
+
+      if (rows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ success: false, message: 'Paiement introuvable' });
+      }
+
+      const payment = rows[0];
+      if (payment.status === 'PAID') {
+        await connection.commit();
+        return res.json({ success: true, message: 'Déjà validé' });
+      }
+
+      await connection.execute(
+        `UPDATE payments SET status = 'PAID', paid_at = NOW() WHERE id = ?`,
+        [payment.id]
+      );
+
+      const createdTickets = [];
+      const unitPrice = Number(payment.amount) / payment.quantity;
+
+      for (let i = 0; i < payment.quantity; i++) {
+        const ticketCode = generateTicketCode(payment.ticket_type);
+        const [result] = await connection.execute(
+          `INSERT INTO tickets (ticket_code, type, user_id, price, payment_method, status)
+           VALUES (?, ?, ?, ?, 'Wave', 'ACTIVE')`,
+          [ticketCode, payment.ticket_type, payment.user_id, unitPrice]
+        );
+        createdTickets.push({
+          id: result.insertId,
+          ticket_code: ticketCode,
+          type: payment.ticket_type,
+          price: unitPrice,
+          status: 'ACTIVE',
+        });
+      }
+
+      await connection.execute(
+        `INSERT INTO transactions (user_id, type, amount, description, reference_id)
+         VALUES (?, 'ACHAT', ?, ?, ?)`,
+        [
+          payment.user_id,
+          payment.amount,
+          `Achat de ${payment.quantity} ticket(s) ${payment.ticket_type} (Wave)`,
+          createdTickets[0]?.id || null,
+        ]
+      );
+
+      await connection.commit();
+      broadcast({ type: 'TICKETS_BOUGHT', user_id: payment.user_id, tickets: createdTickets });
+
+      res.json({ success: true, message: 'Paiement Wave validé et tickets créés', tickets: createdTickets });
+    } catch (e) {
+      await connection.rollback();
+      throw e;
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    console.error('Erreur confirm wave-simulator:', err);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
 app.get('/api/payments/success', (req, res) => {
   res.send(
     '<h2>Paiement réussi</h2><p>Vous pouvez revenir dans l\'application Ticket Resto.</p>'

@@ -29,8 +29,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   final List<String> _userTypes = [
     'Étudiant',
-    'Agent universitaire',
-    'Administrateur',
   ];
 
   @override

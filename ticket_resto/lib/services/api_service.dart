@@ -233,7 +233,7 @@ class ApiService {
     );
   }
 
-  // ==================== LISTE DES UTILISATEURS ====================
+  // ==================== LISTE DES UTILISATEURS (ADMIN) ====================
   static Future<Map<String, dynamic>> getUsers({String? token}) async {
     try {
       final headers = await _headers(withAuth: true, token: token);
@@ -253,6 +253,37 @@ class ApiService {
         return {
           'success': false,
           'message': data['message'] ?? 'Erreur',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Impossible de contacter le serveur.',
+      };
+    }
+  }
+
+  // ==================== RECHERCHE UTILISATEUR PAR EMAIL ====================
+  static Future<Map<String, dynamic>> lookupUserByEmail(String email, {String? token}) async {
+    try {
+      final headers = await _headers(withAuth: true, token: token);
+      final encodedEmail = Uri.encodeComponent(email.trim().toLowerCase());
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/api/mobile/users/lookup?email=$encodedEmail'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'user': data['user'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Utilisateur introuvable',
         };
       }
     } catch (e) {

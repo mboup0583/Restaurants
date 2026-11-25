@@ -121,6 +121,60 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
     );
   }
 
+  Future<String?> _showPhonePromptDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.phone_android, color: Color(0xFF1B5E20)),
+            SizedBox(width: 8),
+            Text('Numéro Wave requis', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Veuillez saisir votre numéro Wave pour le paiement :',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.phone,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Numéro Wave (ex: 77 123 45 67)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) Navigator.pop(ctx, text);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1B5E20),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleBuy() async {
     if (_isLoading) return;
 
@@ -144,32 +198,12 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
       return;
     }
 
-    if (user.phone == null || user.phone!.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Aucun numéro Wave sur ton compte. Réinscris-toi avec ton numéro.',
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+    String? phone = user.phone;
+    if (phone == null || phone.trim().isEmpty) {
+      phone = await _showPhonePromptDialog(context);
+      if (phone == null || phone.trim().isEmpty) return;
     }
 
-    final price =
-        _selectedType == 'Petit-déjeuner' ? _petitDejeunerPrice : _repasPrice;
-    final total = price * _quantity;
-    if (total < 200) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Montant minimum Wave : 200 FCFA. Au moins 2 repas ou 4 petits-déjeuners.',
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
 
     setState(() => _isLoading = true);
 
@@ -179,7 +213,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
         type: _selectedType,
         quantity: _quantity,
         paymentMethod: 'Wave',
-        phone: user.phone,
+        phone: phone,
       );
 
       if (!mounted) return;
@@ -408,7 +442,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Montant minimum Wave : 200 FCFA',
+                        'Paiement instantané et sécurisé via Wave',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 30),
