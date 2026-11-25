@@ -260,17 +260,28 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
       await _savePendingPayment(id);
 
       final uri = Uri.parse(paymentUrl);
-      if (!await canLaunchUrl(uri)) {
+      bool launched = false;
+      try {
+        if (await canLaunchUrl(uri)) {
+          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      } catch (_) {}
+
+      if (!launched) {
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+        } catch (_) {}
+      }
+
+      if (!launched) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Impossible d\'ouvrir Wave'),
+            content: Text('Impossible d\'ouvrir la page de paiement Wave'),
             backgroundColor: Colors.red,
           ),
         );
         return;
       }
-
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
 
       // Première vague de vérif (pendant / juste après Wave)
       // Le vrai filet = didChangeAppLifecycleState au retour

@@ -5,6 +5,17 @@ let allUsers = [];
 let allTickets = [];
 let allRefunds = [];
 
+// ---------- HELPER XSS SANITIZATION ----------
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ---------- HEADERS AUTH ----------
 function authHeaders() {
   const token = localStorage.getItem('admin_token');
@@ -101,13 +112,13 @@ async function loadDashboard() {
     const s = data.stats;
     const rev = s.revenue || {};
     container.innerHTML = `
-      <div class="card green"><div class="label">Ventes totales</div><div class="value">${rev.total_sales || 0} FCFA</div></div>
-      <div class="card orange"><div class="label">Remboursements</div><div class="value">${rev.total_refunded || 0} FCFA</div></div>
-      <div class="card blue"><div class="label">Total tickets</div><div class="value">${rev.total_tickets || 0}</div></div>
-      <div class="card teal"><div class="label">Tickets (7 jours)</div><div class="value">${s.tickets_last_7_days || 0}</div></div>
+      <div class="card green"><div class="label">Ventes totales</div><div class="value">${Number(rev.total_sales || 0)} FCFA</div></div>
+      <div class="card orange"><div class="label">Remboursements</div><div class="value">${Number(rev.total_refunded || 0)} FCFA</div></div>
+      <div class="card blue"><div class="label">Total tickets</div><div class="value">${Number(rev.total_tickets || 0)}</div></div>
+      <div class="card teal"><div class="label">Tickets (7 jours)</div><div class="value">${Number(s.tickets_last_7_days || 0)}</div></div>
     `;
   } catch (e) {
-    container.innerHTML = `<p class="error">${e.message}</p>`;
+    container.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
   }
 }
 
@@ -123,7 +134,7 @@ async function loadUsers() {
     renderUsers();
   } catch (e) {
     document.getElementById('users-tbody').innerHTML =
-      `<tr><td colspan="7">${e.message}</td></tr>`;
+      `<tr><td colspan="7">${escapeHtml(e.message)}</td></tr>`;
   }
 }
 
@@ -138,15 +149,15 @@ function renderUsers() {
     const active = u.is_active == 1 || u.is_active === true;
     return `
       <tr>
-        <td>${u.id}</td>
-        <td>${u.full_name || ''}</td>
-        <td>${u.email || ''}</td>
-        <td><span class="badge ${typeClass}">${u.user_type || ''}</span></td>
-        <td>${u.student_id || '—'}</td>
+        <td>${Number(u.id)}</td>
+        <td>${escapeHtml(u.full_name || '')}</td>
+        <td>${escapeHtml(u.email || '')}</td>
+        <td><span class="badge ${typeClass}">${escapeHtml(u.user_type || '')}</span></td>
+        <td>${escapeHtml(u.student_id || '—')}</td>
         <td>${active ? 'Actif' : 'Inactif'}</td>
         <td>
-          <button class="btn-sm btn-edit" onclick="openEditUser(${u.id})">Modifier</button>
-          <button class="btn-sm btn-delete" onclick="deleteUser(${u.id})">Supprimer</button>
+          <button class="btn-sm btn-edit" onclick="openEditUser(${Number(u.id)})">Modifier</button>
+          <button class="btn-sm btn-delete" onclick="deleteUser(${Number(u.id)})">Supprimer</button>
         </td>
       </tr>
     `;
@@ -233,7 +244,7 @@ async function loadTickets() {
     renderTickets();
   } catch (e) {
     document.getElementById('tickets-tbody').innerHTML =
-      `<tr><td colspan="7">${e.message}</td></tr>`;
+      `<tr><td colspan="7">${escapeHtml(e.message)}</td></tr>`;
   }
 }
 
@@ -252,13 +263,13 @@ function renderTickets() {
     const date = t.created_at ? new Date(t.created_at).toLocaleString('fr-FR') : '';
     return `
       <tr>
-        <td style="font-family:monospace;font-size:.8rem">${t.ticket_code || ''}</td>
-        <td>${t.type || ''}</td>
-        <td>${t.price || ''} FCFA</td>
-        <td>${t.full_name || '—'}</td>
-        <td>${t.payment_method || '—'}</td>
-        <td><span class="badge ${statusClass[t.status] || ''}">${statusLabel[t.status] || t.status}</span></td>
-        <td>${date}</td>
+        <td style="font-family:monospace;font-size:.8rem">${escapeHtml(t.ticket_code || '')}</td>
+        <td>${escapeHtml(t.type || '')}</td>
+        <td>${Number(t.price || 0)} FCFA</td>
+        <td>${escapeHtml(t.full_name || '—')}</td>
+        <td>${escapeHtml(t.payment_method || '—')}</td>
+        <td><span class="badge ${statusClass[t.status] || ''}">${escapeHtml(statusLabel[t.status] || t.status)}</span></td>
+        <td>${escapeHtml(date)}</td>
       </tr>
     `;
   }).join('');
@@ -279,7 +290,7 @@ async function loadRefunds() {
     renderRefunds();
   } catch (e) {
     document.getElementById('refunds-tbody').innerHTML =
-      `<tr><td colspan="8">${e.message}</td></tr>`;
+      `<tr><td colspan="8">${escapeHtml(e.message)}</td></tr>`;
   }
 }
 
@@ -291,18 +302,18 @@ function renderRefunds() {
   document.getElementById('refunds-tbody').innerHTML = allRefunds.map((r) => {
     const date = r.created_at ? new Date(r.created_at).toLocaleString('fr-FR') : '';
     const actions = r.status === 'PENDING'
-      ? `<button class="btn-sm btn-ok" onclick="processRefund(${r.id},'COMPLETED')">Accepter</button>
-         <button class="btn-sm btn-no" onclick="processRefund(${r.id},'REJECTED')">Refuser</button>`
+      ? `<button class="btn-sm btn-ok" onclick="processRefund(${Number(r.id)},'COMPLETED')">Accepter</button>
+         <button class="btn-sm btn-no" onclick="processRefund(${Number(r.id)},'REJECTED')">Refuser</button>`
       : '—';
     return `
       <tr>
-        <td>${r.id}</td>
-        <td>${r.full_name || ''} <br><small>${r.email || ''}</small></td>
-        <td>${r.ticket_type || ''} <br><small style="font-family:monospace">${r.ticket_code || ''}</small></td>
-        <td>${r.amount} FCFA</td>
-        <td>${r.payment_method || ''}</td>
-        <td><span class="badge ${statusClass[r.status] || ''}">${statusLabel[r.status] || r.status}</span></td>
-        <td>${date}</td>
+        <td>${Number(r.id)}</td>
+        <td>${escapeHtml(r.full_name || '')} <br><small>${escapeHtml(r.email || '')}</small></td>
+        <td>${escapeHtml(r.ticket_type || '')} <br><small style="font-family:monospace">${escapeHtml(r.ticket_code || '')}</small></td>
+        <td>${Number(r.amount || 0)} FCFA</td>
+        <td>${escapeHtml(r.payment_method || '')}</td>
+        <td><span class="badge ${statusClass[r.status] || ''}">${escapeHtml(statusLabel[r.status] || r.status)}</span></td>
+        <td>${escapeHtml(date)}</td>
         <td>${actions}</td>
       </tr>
     `;
