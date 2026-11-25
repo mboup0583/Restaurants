@@ -1411,8 +1411,10 @@ app.get('/api/payments/wave-checkout', async (req, res) => {
     .order-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
     .order-row:last-child { margin-bottom: 0; border-top: 1px dashed #cbd5e1; padding-top: 10px; font-weight: 800; font-size: 16px; color: #0f172a; }
     .order-label { color: #64748b; }
-    .btn-pay { background: #1DA1F2; color: #ffffff; border: none; width: 100%; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 14px rgba(29, 161, 242, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .btn-pay:hover { background: #0c85d0; transform: translateY(-1px); }
+    .btn-wave { background: #1DA1F2; color: #ffffff; text-decoration: none; width: 100%; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 14px rgba(29, 161, 242, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-wave:hover { background: #0c85d0; transform: translateY(-1px); }
+    .btn-pay { background: #1B5E20; color: #ffffff; border: none; width: 100%; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 6px 14px rgba(27, 94, 32, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-pay:hover { background: #0D3810; transform: translateY(-1px); }
     .success-box { display: none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 16px; padding: 20px; color: #065f46; margin-top: 16px; }
     .univ-tag { font-size: 11px; color: #94a3b8; margin-top: 20px; }
   </style>
@@ -1453,12 +1455,21 @@ app.get('/api/payments/wave-checkout', async (req, res) => {
       </div>
     `
         : `
-      <button class="btn-pay" id="btn-submit" onclick="validerPaiement()">
-        <span>Confirmer le paiement de ${Number(payment.amount)} FCFA avec Wave</span>
-      </button>
+      <div id="payment-actions">
+        <a href="https://pay.wave.com/m/M_sn_IMNGjgji-XQs/c/sn/" target="_blank" class="btn-wave" id="btn-wave">
+          <svg style="width:22px;height:22px;fill:white;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm4 0h-2v-6h2v6zm-2-8c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg>
+          <span>1. Payer ${Number(payment.amount)} FCFA sur l'app Wave</span>
+        </a>
+        <p style="font-size:12px;color:#64748b;margin:12px 0 16px;line-height:1.4;">
+          Appuyez sur le bouton bleu ci-dessus pour ouvrir l'application <strong>Wave</strong> et transférer le montant vers le compte marchand officiel <strong>Mboup (78 321 78 29)</strong>.
+        </p>
+        <button class="btn-pay" id="btn-submit" onclick="validerPaiement()">
+          <span>2. J'ai payé sur Wave (Recevoir mes tickets)</span>
+        </button>
+      </div>
       <div class="success-box" id="success-view">
         <h3 style="margin-bottom:6px;">🎉 Paiement réussi !</h3>
-        <p style="font-size:13px;">Vos ${Number(payment.quantity)} ticket(s) ${safeType} ont été générés.<br>Vous pouvez revenir dans l'application Ticket Resto.</p>
+        <p style="font-size:13px;">Vos ${Number(payment.quantity)} ticket(s) ${safeType} ont été générés avec succès.<br>Vous pouvez revenir dans l'application Ticket Resto.</p>
       </div>
     `
     }
@@ -1483,7 +1494,7 @@ app.get('/api/payments/wave-checkout', async (req, res) => {
         });
         const data = await res.json();
         if (data.success) {
-          btn.style.display = 'none';
+          document.getElementById('payment-actions').style.display = 'none';
           document.getElementById('success-view').style.display = 'block';
         } else {
           alert('Erreur: ' + (data.message || 'Impossible de valider le paiement'));
