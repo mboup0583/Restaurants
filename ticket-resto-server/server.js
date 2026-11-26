@@ -224,6 +224,7 @@ async function sendVerificationEmail({ to, fullName, code }) {
   // 1. Solution Prioritaire Cloud : Brevo HTTPS API (Port 443 - 300 emails gratuits/jour)
   const brevoKey = (process.env.BREVO_API_KEY || '').trim();
   if (brevoKey) {
+    const brevoSender = (process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER || 'mboup0583@gmail.com').trim();
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -232,7 +233,7 @@ async function sendVerificationEmail({ to, fullName, code }) {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        sender: { name: 'Ticket Resto UASZ', email: SMTP_USER },
+        sender: { name: 'Ticket Resto UASZ', email: brevoSender },
         to: [{ email: to, name: fullName }],
         subject,
         htmlContent,
