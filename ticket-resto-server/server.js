@@ -330,6 +330,7 @@ app.post('/api/mobile/send-verification-code', otpLimiter, async (req, res) => {
       return res.status(500).json({
         success: false,
         message: 'Impossible d\'envoyer l\'email de vérification à cette adresse. Veuillez vérifier votre connexion et l\'adresse renseignée.',
+        error_details: mailErr.message,
       });
     }
 
