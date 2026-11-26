@@ -20,6 +20,7 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
   bool _isLoading = false;
   bool _waitingPayment = false;
   int? _pendingPaymentId;
+  String? _lastPaymentUrl;
 
   int _petitDejeunerPrice = 50;
   int _repasPrice = 100;
@@ -257,16 +258,27 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
 
       _pendingPaymentId = id;
       _waitingPayment = true;
+      _lastPaymentUrl = paymentUrl;
       await _savePendingPayment(id);
 
       final uri = Uri.parse(paymentUrl);
       bool launched = false;
+
+      // 1. Priorité absolue : ouvrir directement l'application Wave native (sans navigateur)
       try {
-        if (await canLaunchUrl(uri)) {
-          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
+        launched = await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
       } catch (_) {}
 
+      // 2. Fallback application externe
+      if (!launched) {
+        try {
+          if (await canLaunchUrl(uri)) {
+            launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        } catch (_) {}
+      }
+
+      // 3. Fallback plateforme par défaut
       if (!launched) {
         try {
           launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
@@ -274,12 +286,14 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
       }
 
       if (!launched) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Impossible d\'ouvrir la page de paiement Wave'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Impossible d\'ouvrir l\'application Wave'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         return;
       }
 
@@ -485,11 +499,82 @@ class _BuyTicketsScreenState extends State<BuyTicketsScreen>
                         ),
                       ),
                       if (_waitingPayment) ...[
-                        const SizedBox(height: 16),
-                        const Text(
-                          'En attente de confirmation Wave…\nAprès paiement, reviens simplement dans Ticket Resto.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: const Color(0xFF1B5E20)),
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF1B5E20),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.payment, color: Color(0xFF1B5E20)),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Paiement Wave en cours',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1B5E20),
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Avez-vous effectué le paiement sur l\'application Wave ?',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 13),
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 46,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _pollVerify(maxTries: 3, delaySeconds: 1),
+                                  icon: const Icon(Icons.check_circle, color: Colors.white),
+                                  label: const Text(
+                                    'J\'ai payé (Obtenir mes tickets)',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1B5E20),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_lastPaymentUrl != null) ...[
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  onPressed: () async {
+                                    final u = Uri.parse(_lastPaymentUrl!);
+                                    try {
+                                      await launchUrl(u, mode: LaunchMode.externalNonBrowserApplication);
+                                    } catch (_) {
+                                      launchUrl(u, mode: LaunchMode.externalApplication);
+                                    }
+                                  },
+                                  icon: const Icon(Icons.open_in_new, size: 16, color: Color(0xFF1B5E20)),
+                                  label: const Text(
+                                    'Réouvrir l\'application Wave',
+                                    style: TextStyle(fontSize: 12, color: Color(0xFF1B5E20)),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ],
                       const SizedBox(height: 40),

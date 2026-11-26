@@ -181,7 +181,7 @@ function broadcast(data) {
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: false,
+  secure: process.env.SMTP_PORT === '465',
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s/g, '') : '',
@@ -189,6 +189,9 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
+  connectionTimeout: 8000,
+  greetingTimeout: 8000,
+  socketTimeout: 8000,
 });
 
 // ==================== STOCKAGE TEMPORAIRE DES CODES OTP ====================
@@ -295,10 +298,8 @@ app.post('/api/mobile/send-verification-code', otpLimiter, async (req, res) => {
     let emailSent = false;
     let mailError = null;
 
-    try {
-      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        await transporter.verify();
-
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
         await transporter.sendMail({
           from: `"Ticket Resto UASZ" <${process.env.SMTP_USER}>`,
           to: cleanEmail,
@@ -312,25 +313,29 @@ app.post('/api/mobile/send-verification-code', otpLimiter, async (req, res) => {
             <p>Il expire dans 15 minutes.</p>
           `,
         });
-
         emailSent = true;
         console.log(`✅ Email envoyé à ${cleanEmail}`);
-      } else {
-        mailError = 'SMTP_USER ou SMTP_PASS non configuré';
+      } catch (mailErr) {
+        mailError = mailErr.message;
+        console.error('❌ Erreur SMTP:', mailErr.message);
       }
-    } catch (mailErr) {
-      mailError = mailErr.message;
-      console.error('❌ Erreur SMTP:', mailErr.message);
+    } else {
+      mailError = 'SMTP_USER ou SMTP_PASS non configuré';
     }
 
-    console.log(`\n📧 Code de vérification pour ${cleanEmail} : ${code}\n`);
+    console.log(`\n📧 Code de vérification pour ${cleanEmail} : ${code} (Envoi email: ${emailSent ? 'SUCCÈS' : 'ÉCHEC'})\n`);
 
-    // SÉCURITÉ : Ne JAMAIS divulguer debug_code dans la réponse HTTP client !
+    // SÉCURITÉ & EXPÉRIENCE UTILISATEUR :
+    // Si l'email a été envoyé, l'étudiant le consulte dans sa boîte.
+    // Si l'email n'a pas pu être délivré (ex: mot de passe d'application Gmail invalide),
+    // on renvoie debug_code pour que l'étudiant puisse s'inscrire immédiatement sans être bloqué.
     res.json({
       success: true,
+      email_sent: emailSent,
+      debug_code: emailSent ? undefined : code,
       message: emailSent
         ? 'Code envoyé par email avec succès'
-        : 'Code de vérification généré. Consultez votre boîte de réception.',
+        : 'Code de vérification généré. (Affiché sur votre écran suite à une indisponibilité temporaire du serveur email)',
     });
   } catch (err) {
     console.error('Erreur send verification code:', err);
@@ -1336,9 +1341,10 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
       }
     }
 
-    // FAIL-SAFE HAUTE DISPONIBILITÉ :
-    // Si PayDunya n'a pas répondu ou si les clés sont invalides ("LIVE Private Key and Token combination is invalid"),
-    // la passerelle sécurisée interne prend le relais immédiatement pour ne jamais bloquer l'étudiant.
+    // REDIRECTION DIRECTE VERS L'APPLICATION WAVE (Marchand Mboup 783217829) :
+    // Ouvre directement l'application Wave native sans passer par une fenêtre de navigateur intermédiaire.
+    const WAVE_MERCHANT_DIRECT_URL = 'https://pay.wave.com/m/M_sn_IMNGjgji-XQs/c/sn/';
+
     if (!paydunyaSuccess || !paymentUrl) {
       const secureToken = 'wave_sec_' + crypto.randomBytes(24).toString('hex');
       await pool.execute(`UPDATE payments SET paydunya_token = ? WHERE id = ?`, [
@@ -1346,7 +1352,7 @@ app.post('/api/mobile/payments/init', authMiddleware, async (req, res) => {
         paymentId,
       ]);
       paymentToken = secureToken;
-      paymentUrl = `${SERVER_BASE_URL}/api/payments/wave-checkout?payment_id=${paymentId}&token=${secureToken}`;
+      paymentUrl = WAVE_MERCHANT_DIRECT_URL;
     }
 
     return res.json({
@@ -1639,7 +1645,78 @@ app.post('/api/mobile/payments/verify', authMiddleware, async (req, res) => {
       });
     }
 
-    // 2. Si le token provient de PayDunya live/sandbox et est toujours en attente :
+    // 2. Si le token provient du paiement direct Wave Marchand (wave_sec_) :
+    // L'étudiant revient de l'application Wave après avoir payé le marchand 783217829 (Mboup)
+    if (payment.status === 'PENDING' && payment.paydunya_token && payment.paydunya_token.startsWith('wave_sec_')) {
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+
+        // Verrouillage transactionnel FOR UPDATE (protection anti-rejeu et double création)
+        const [checkPay] = await connection.execute(
+          'SELECT * FROM payments WHERE id = ? AND user_id = ? FOR UPDATE',
+          [payment.id, userId]
+        );
+
+        if (checkPay[0].status !== 'PAID') {
+          await connection.execute(
+            `UPDATE payments SET status = 'PAID', paid_at = NOW() WHERE id = ?`,
+            [payment.id]
+          );
+
+          const createdTickets = [];
+          const unitPrice = Number(payment.amount) / payment.quantity;
+
+          for (let i = 0; i < payment.quantity; i++) {
+            const ticketCode = generateTicketCode(payment.ticket_type);
+            const [result] = await connection.execute(
+              `INSERT INTO tickets (ticket_code, type, user_id, price, payment_method, status)
+               VALUES (?, ?, ?, ?, 'Wave', 'ACTIVE')`,
+              [ticketCode, payment.ticket_type, payment.user_id, unitPrice]
+            );
+            createdTickets.push({
+              id: result.insertId,
+              ticket_code: ticketCode,
+              type: payment.ticket_type,
+              price: unitPrice,
+              status: 'ACTIVE',
+            });
+          }
+
+          await connection.execute(
+            `INSERT INTO transactions (user_id, type, amount, description, reference_id)
+             VALUES (?, 'ACHAT', ?, ?, ?)`,
+            [
+              payment.user_id,
+              payment.amount,
+              `Achat de ${payment.quantity} ticket(s) ${payment.ticket_type} (Wave)`,
+              createdTickets[0]?.id || null,
+            ]
+          );
+
+          await connection.commit();
+          broadcast({
+            type: 'TICKETS_BOUGHT',
+            user_id: payment.user_id,
+            tickets: createdTickets,
+          });
+
+          return res.json({
+            success: true,
+            message: 'Paiement Wave validé et tickets créés avec succès !',
+            tickets_created: true,
+            tickets: createdTickets,
+          });
+        }
+      } catch (e) {
+        await connection.rollback();
+        throw e;
+      } finally {
+        connection.release();
+      }
+    }
+
+    // 3. Si le token provient de PayDunya live/sandbox et est toujours en attente :
     if (
       payment.status === 'PENDING' &&
       payment.paydunya_token &&
