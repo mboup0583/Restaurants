@@ -177,7 +177,7 @@ function broadcast(data) {
   });
 }
 
-// ==================== CONFIGURATION EMAIL (PRODUCTION RÉELLE GMAIL) ====================
+// ==================== CONFIGURATION EMAIL (PRODUCTION RÉELLE) ====================
 const SMTP_USER = process.env.SMTP_USER || 'mboup0583@gmail.com';
 const SMTP_PASS = (process.env.SMTP_PASS || 'yjokcbvfsojrsyqi').replace(/\s/g, '');
 
@@ -191,6 +191,95 @@ const transporter = nodemailer.createTransport({
   greetingTimeout: 10000,
   socketTimeout: 10000,
 });
+
+// Envoi d'email résilient (Supporte HTTPS API Brevo/Resend sur Port 443 pour contourner le blocage SMTP des hébergeurs cloud)
+async function sendVerificationEmail({ to, fullName, code }) {
+  const subject = 'Votre code de vérification Ticket Resto UASZ';
+  const textContent = `Bonjour ${fullName},\n\nVotre code de vérification pour confirmer votre compte Ticket Resto est : ${code}\n\nCe code expire dans 15 minutes.\n\nUniversité Assane Seck de Ziguinchor`;
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: #1B5E20; margin: 0; font-size: 22px;">Ticket Resto UASZ</h2>
+        <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">CROUS - Université Assane Seck de Ziguinchor</p>
+      </div>
+      <p style="font-size: 15px; color: #333;">Bonjour <strong>${escapeHtml(fullName)}</strong>,</p>
+      <p style="font-size: 14px; color: #555; line-height: 1.5;">
+        Veuillez utiliser le code de vérification ci-dessous pour confirmer la création de votre compte :
+      </p>
+      <div style="text-align: center; margin: 28px 0;">
+        <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 10px; color: #1B5E20; background: #e8f5e9; padding: 14px 28px; border-radius: 8px; border: 2px dashed #1B5E20;">
+          ${code}
+        </span>
+      </div>
+      <p style="font-size: 13px; color: #777; line-height: 1.4;">
+        ⚠️ Ce code expire dans <strong>15 minutes</strong>. Ne le communiquez à personne.
+      </p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #999; text-align: center; margin: 0;">
+        Ceci est un message automatique de l'Université Assane Seck de Ziguinchor. Merci de ne pas y répondre.
+      </p>
+    </div>
+  `;
+
+  // 1. Solution Prioritaire Cloud : Brevo HTTPS API (Port 443 - 300 emails gratuits/jour)
+  const brevoKey = (process.env.BREVO_API_KEY || '').trim();
+  if (brevoKey) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'api-key': brevoKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: 'Ticket Resto UASZ', email: SMTP_USER },
+        to: [{ email: to, name: fullName }],
+        subject,
+        htmlContent,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Brevo HTTPS API (${res.status}): ${err.message || res.statusText}`);
+    }
+    console.log(`✅ Email envoyé via Brevo HTTPS API (Port 443) à ${to}`);
+    return;
+  }
+
+  // 2. Solution Alternative Cloud : Resend HTTPS API (Port 443)
+  const resendKey = (process.env.RESEND_API_KEY || '').trim();
+  if (resendKey) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `Ticket Resto UASZ <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`,
+        to: [to],
+        subject,
+        html: htmlContent,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Resend HTTPS API (${res.status}): ${err.message || res.statusText}`);
+    }
+    console.log(`✅ Email envoyé via Resend HTTPS API (Port 443) à ${to}`);
+    return;
+  }
+
+  // 3. Solution Standard : SMTP Gmail direct (Ports 465/587)
+  await transporter.sendMail({
+    from: `"Ticket Resto UASZ" <${SMTP_USER}>`,
+    to,
+    subject,
+    text: textContent,
+    html: htmlContent,
+  });
+  console.log(`✅ Email envoyé via SMTP Gmail direct à ${to}`);
+}
 
 // ==================== STOCKAGE TEMPORAIRE DES CODES OTP ====================
 const verificationCodes = new Map();
@@ -294,39 +383,14 @@ app.post('/api/mobile/send-verification-code', otpLimiter, async (req, res) => {
     });
 
     try {
-      await transporter.sendMail({
-        from: `"Ticket Resto UASZ" <${SMTP_USER}>`,
+      await sendVerificationEmail({
         to: cleanEmail,
-        subject: 'Votre code de vérification Ticket Resto UASZ',
-        text: `Bonjour ${full_name},\n\nVotre code de vérification pour confirmer votre compte Ticket Resto est : ${code}\n\nCe code expire dans 15 minutes.\n\nUniversité Assane Seck de Ziguinchor`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #1B5E20; margin: 0; font-size: 22px;">Ticket Resto UASZ</h2>
-              <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">CROUS - Université Assane Seck de Ziguinchor</p>
-            </div>
-            <p style="font-size: 15px; color: #333;">Bonjour <strong>${escapeHtml(full_name)}</strong>,</p>
-            <p style="font-size: 14px; color: #555; line-height: 1.5;">
-              Veuillez utiliser le code de vérification ci-dessous pour confirmer la création de votre compte :
-            </p>
-            <div style="text-align: center; margin: 28px 0;">
-              <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 10px; color: #1B5E20; background: #e8f5e9; padding: 14px 28px; border-radius: 8px; border: 2px dashed #1B5E20;">
-                ${code}
-              </span>
-            </div>
-            <p style="font-size: 13px; color: #777; line-height: 1.4;">
-              ⚠️ Ce code expire dans <strong>15 minutes</strong>. Ne le communiquez à personne.
-            </p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-            <p style="font-size: 11px; color: #999; text-align: center; margin: 0;">
-              Ceci est un message automatique de l'Université Assane Seck de Ziguinchor. Merci de ne pas y répondre.
-            </p>
-          </div>
-        `,
+        fullName: full_name,
+        code,
       });
       console.log(`✅ Email réel de vérification expédié avec succès à ${cleanEmail}`);
     } catch (mailErr) {
-      console.error('❌ Erreur critique envoi email SMTP:', mailErr.message);
+      console.error('❌ Erreur critique envoi email:', mailErr.message);
       return res.status(500).json({
         success: false,
         message: 'Impossible d\'envoyer l\'email de vérification à cette adresse. Veuillez vérifier votre connexion et l\'adresse renseignée.',
