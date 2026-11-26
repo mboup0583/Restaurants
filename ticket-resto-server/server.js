@@ -177,21 +177,19 @@ function broadcast(data) {
   });
 }
 
-// ==================== CONFIGURATION EMAIL ====================
+// ==================== CONFIGURATION EMAIL (PRODUCTION RÉELLE GMAIL) ====================
+const SMTP_USER = process.env.SMTP_USER || 'mboup0583@gmail.com';
+const SMTP_PASS = (process.env.SMTP_PASS || 'yjokcbvfsojrsyqi').replace(/\s/g, '');
+
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: process.env.SMTP_PORT === '465',
+  service: 'gmail',
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s/g, '') : '',
+    user: SMTP_USER,
+    pass: SMTP_PASS,
   },
-  tls: {
-    rejectUnauthorized: false,
-  },
-  connectionTimeout: 8000,
-  greetingTimeout: 8000,
-  socketTimeout: 8000,
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
 });
 
 // ==================== STOCKAGE TEMPORAIRE DES CODES OTP ====================
@@ -295,47 +293,50 @@ app.post('/api/mobile/send-verification-code', otpLimiter, async (req, res) => {
       attempts: 0,
     });
 
-    let emailSent = false;
-    let mailError = null;
-
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      try {
-        await transporter.sendMail({
-          from: `"Ticket Resto UASZ" <${process.env.SMTP_USER}>`,
-          to: cleanEmail,
-          subject: 'Code de vérification - Ticket Resto',
-          text: `Bonjour ${full_name},\n\nVotre code de vérification Ticket Resto est : ${code}\n\nIl expire dans 15 minutes.\n\nTicket Resto UASZ`,
-          html: `
-            <h2>Ticket Resto UASZ</h2>
-            <p>Bonjour <strong>${escapeHtml(full_name)}</strong>,</p>
-            <p>Votre code de vérification est :</p>
-            <h1 style="letter-spacing:8px;color:#1B5E20;">${code}</h1>
-            <p>Il expire dans 15 minutes.</p>
-          `,
-        });
-        emailSent = true;
-        console.log(`✅ Email envoyé à ${cleanEmail}`);
-      } catch (mailErr) {
-        mailError = mailErr.message;
-        console.error('❌ Erreur SMTP:', mailErr.message);
-      }
-    } else {
-      mailError = 'SMTP_USER ou SMTP_PASS non configuré';
+    try {
+      await transporter.sendMail({
+        from: `"Ticket Resto UASZ" <${SMTP_USER}>`,
+        to: cleanEmail,
+        subject: 'Votre code de vérification Ticket Resto UASZ',
+        text: `Bonjour ${full_name},\n\nVotre code de vérification pour confirmer votre compte Ticket Resto est : ${code}\n\nCe code expire dans 15 minutes.\n\nUniversité Assane Seck de Ziguinchor`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h2 style="color: #1B5E20; margin: 0; font-size: 22px;">Ticket Resto UASZ</h2>
+              <p style="color: #666; font-size: 13px; margin: 4px 0 0 0;">CROUS - Université Assane Seck de Ziguinchor</p>
+            </div>
+            <p style="font-size: 15px; color: #333;">Bonjour <strong>${escapeHtml(full_name)}</strong>,</p>
+            <p style="font-size: 14px; color: #555; line-height: 1.5;">
+              Veuillez utiliser le code de vérification ci-dessous pour confirmer la création de votre compte :
+            </p>
+            <div style="text-align: center; margin: 28px 0;">
+              <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 10px; color: #1B5E20; background: #e8f5e9; padding: 14px 28px; border-radius: 8px; border: 2px dashed #1B5E20;">
+                ${code}
+              </span>
+            </div>
+            <p style="font-size: 13px; color: #777; line-height: 1.4;">
+              ⚠️ Ce code expire dans <strong>15 minutes</strong>. Ne le communiquez à personne.
+            </p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+            <p style="font-size: 11px; color: #999; text-align: center; margin: 0;">
+              Ceci est un message automatique de l'Université Assane Seck de Ziguinchor. Merci de ne pas y répondre.
+            </p>
+          </div>
+        `,
+      });
+      console.log(`✅ Email réel de vérification expédié avec succès à ${cleanEmail}`);
+    } catch (mailErr) {
+      console.error('❌ Erreur critique envoi email SMTP:', mailErr.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Impossible d\'envoyer l\'email de vérification à cette adresse. Veuillez vérifier votre connexion et l\'adresse renseignée.',
+      });
     }
 
-    console.log(`\n📧 Code de vérification pour ${cleanEmail} : ${code} (Envoi email: ${emailSent ? 'SUCCÈS' : 'ÉCHEC'})\n`);
-
-    // SÉCURITÉ & EXPÉRIENCE UTILISATEUR :
-    // Si l'email a été envoyé, l'étudiant le consulte dans sa boîte.
-    // Si l'email n'a pas pu être délivré (ex: mot de passe d'application Gmail invalide),
-    // on renvoie debug_code pour que l'étudiant puisse s'inscrire immédiatement sans être bloqué.
+    // SÉCURITÉ PRODUCTION STRICTE : AUCUN code n'est divulgué dans la réponse HTTP client !
     res.json({
       success: true,
-      email_sent: emailSent,
-      debug_code: emailSent ? undefined : code,
-      message: emailSent
-        ? 'Code envoyé par email avec succès'
-        : 'Code de vérification généré. (Affiché sur votre écran suite à une indisponibilité temporaire du serveur email)',
+      message: 'Code de vérification envoyé à votre adresse email.',
     });
   } catch (err) {
     console.error('Erreur send verification code:', err);

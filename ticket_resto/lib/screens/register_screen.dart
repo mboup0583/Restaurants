@@ -87,21 +87,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = false);
 
     if (result['success'] == true) {
-      _showCodeDialog(
-        email: _emailController.text.trim(),
-        debugCode: result['debug_code'],
-      );
+      _showCodeDialog(email: _emailController.text.trim());
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? 'Erreur'),
+          content: Text(result['message'] ?? 'Erreur lors de l\'envoi de l\'email'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  void _showCodeDialog({required String email, String? debugCode}) {
+  void _showCodeDialog({required String email}) {
     final codeController = TextEditingController();
     bool verifying = false;
 
@@ -112,24 +109,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Vérification email'),
+              title: const Row(
+                children: [
+                  Icon(Icons.mark_email_read, color: Color(0xFF1B5E20)),
+                  SizedBox(width: 8),
+                  Text('Vérification email', style: TextStyle(fontSize: 18)),
+                ],
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Un code à 5 chiffres a été envoyé à\n$email',
+                    'Un code de vérification à 5 chiffres a été envoyé sur votre boîte email :\n\n$email',
                     textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
                   ),
-                  if (debugCode != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Code (test) : $debugCode',
-                      style: const TextStyle(
-                        color: const Color(0xFF2E7D32),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Vérifiez votre boîte de réception (et vos spams si besoin).',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   const SizedBox(height: 20),
                   TextField(
                     controller: codeController,

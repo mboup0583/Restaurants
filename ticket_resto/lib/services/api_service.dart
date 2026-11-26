@@ -543,7 +543,6 @@ class ApiService {
         return {
           'success': true,
           'message': data['message'],
-          'debug_code': data['debug_code'],
         };
       } else {
         return {
